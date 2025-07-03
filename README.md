@@ -36,7 +36,7 @@
 
 | Komponen      | Teknologi              |
 |---------------|------------------------|
-| Frontend      | React, TypeScript, Vite, Tailwind CSS |
+| Frontend      | React, TypeScript, Vite, Tailwind CSS, shadcn|
 | Backend       | Motoko (ICP Canister)  |
 | Blockchain    | Internet Computer Protocol (ICP) |
 | Storage       | IPFS via Pinata Web3   |
