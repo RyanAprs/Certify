@@ -5,12 +5,8 @@
       "type": "motoko"
     },
     "Certify_frontend": {
-      "dependencies": [
-        "Certify_backend"
-      ],
-      "source": [
-        "src/Certify_frontend/dist"
-      ],
+      "dependencies": ["Certify_backend"],
+      "source": ["src/Certify_frontend/dist"],
       "type": "assets",
       "workspace": "Certify_frontend"
     }

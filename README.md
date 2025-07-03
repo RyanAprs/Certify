@@ -1,6 +1,178 @@
-# `Certify`
+# 🎓 Certify
 
-Welcome to your new `Certify` project and to the Internet Computer development community. By default, creating a new project adds this README and some template files to your project directory. You can edit these template files to customize your project and to include your own code to speed up the development cycle.
+**Certify** adalah sistem verifikasi **sertifikat digital akademik** berbasis **blockchain** yang mengintegrasikan **Zero-Knowledge Proofs (ZKP)**, **Internet Computer Protocol (ICP)**, dan **IPFS** untuk menjamin **keaslian, privasi**, dan **keamanan** data akademik.
+
+---
+
+## 🚀 Fitur Utama
+
+- 🔐 **Blockchain Security** – Data sertifikat disimpan di canister ICP yang immutable  
+- 🕵️‍♂️ **Zero-Knowledge Proofs** – Verifikasi data tanpa mengungkapkan seluruh informasi  
+- 🗂️ **IPFS Storage** – Sertifikat dalam bentuk file disimpan secara terdesentralisasi  
+- 🔑 **Internet Identity** – Autentikasi tanpa password berbasis identitas digital  
+- 👥 **Multi-Role System** – 3 peran utama: **Issuer**, **Holder**, dan **Verifier**  
+
+---
+
+## 🏗️ Arsitektur Sistem
+
+```
+┌─────────────────┐    ┌────────────────────┐    ┌─────────────────┐
+│     Frontend    │    │   ICP Canister     │    │      IPFS       │
+│   (React + TS)  │◄──►│   (Motoko Smart    │◄──►│   (Pinata Web3)  │
+└─────────────────┘    │    Contract)       │    └─────────────────┘
+         │             └────────────────────┘             ▲
+         ▼                                                │
+ ┌────────────────────┐                                   │
+ │ Zero-Knowledge     │◄──────────────────────────────────┘
+ │ Proof Engine       │
+ │   (SnarkJS)        │
+ └────────────────────┘
+```
+
+---
+
+## 🛠️ Teknologi
+
+| Komponen      | Teknologi              |
+|---------------|------------------------|
+| Frontend      | React, TypeScript, Vite, Tailwind CSS |
+| Backend       | Motoko (ICP Canister)  |
+| Blockchain    | Internet Computer Protocol (ICP) |
+| Storage       | IPFS via Pinata Web3   |
+| Autentikasi   | Internet Identity      |
+| Verifikasi    | Zero-Knowledge Proofs (SnarkJS) |
+
+---
+
+## 📋 Prasyarat
+
+- [Node.js](https://nodejs.org) v16+
+- [DFX SDK](https://internetcomputer.org/docs/current/developer-docs/setup/install/)
+- Akun [Pinata Web3](https://www.pinata.cloud/) untuk penyimpanan IPFS
+
+---
+
+## 🚀 Instalasi & Setup
+
+1. **Clone repository dan jalankan setup**:
+   ```bash
+   git clone <repository-url>
+   cd blockchain-certificate-system
+   chmod +x scripts/setup.sh
+   ./scripts/setup.sh
+   ```
+
+2. **Konfigurasi environment variables**:
+   ```bash
+   cp .env.example .env
+   # Edit .env dan tambahkan API Key dari akun Pinata
+   ```
+
+3. **Jalankan development server**:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## 🎯 Cara Penggunaan
+
+### 🔑 Login
+- Klik **"Login with Internet Identity"**
+- Pilih role: **Issuer**, **Holder**, atau **Verifier**
+
+### 📜 Issuer
+- **Create Certificate**: Buat sertifikat untuk holder yang telah disetujui  
+- **Manage Members**: Terima atau tolak permintaan bergabung  
+- **View Certificates**: Tampilkan daftar sertifikat yang telah diterbitkan
+
+### 🙋‍♂️ Holder
+- **Join Issuer**: Ajukan permintaan menjadi member dari issuer  
+- **View Certificates**: Lihat koleksi sertifikat yang dimiliki  
+- **Share Certificate**: Bagikan sertifikat dengan *selective disclosure*
+
+### 🔍 Verifier
+- **Search Certificate**: Cari sertifikat berdasarkan ID  
+- **Select Fields**: Pilih field yang ingin diverifikasi  
+- **Verify**: Verifikasi keaslian data menggunakan ZKP
+
+---
+
+## 🔐 Zero-Knowledge Proofs
+
+Certify menggunakan ZKP untuk:
+
+- ✅ **Privacy**: Verifikasi tanpa membuka seluruh data
+- 🔍 **Selective Disclosure**: Holder memilih data yang ditampilkan
+- 🧠 **Proof of Authenticity**: Sertifikat dapat dibuktikan asli tanpa mengekspos isinya
+
+---
+
+## 📁 Struktur Proyek
+
+```
+├── src/
+│   ├── backend/               # Motoko canister (ICP)
+│   │   └── main.mo
+│   └── frontend/              # Frontend React
+│       ├── components/
+│       ├── services/
+│       ├── types/
+│       └── declarations/      # Canister declarations
+├── scripts/
+│   └── setup.sh               # Setup script
+├── dfx.json                   # Konfigurasi DFX
+├── package.json
+└── README.md
+```
+
+---
+
+## ⚙️ Perintah Penting
+
+```bash
+# Jalankan pengembangan
+npm run dev
+
+# Build untuk produksi
+npm run build
+
+# Blockchain (ICP)
+dfx start            # Jalankan replica lokal
+dfx deploy           # Deploy canister ke lokal/mainnet
+dfx stop             # Hentikan replica
+
+# Setup awal
+./scripts/setup.sh
+```
+
+---
+
+## 🌐 Deployment
+
+### 🔧 Local Development
+```bash
+dfx start --background
+dfx deploy
+npm run dev
+```
+
+### 🚀 Deploy ke ICP Mainnet
+```bash
+dfx deploy --network ic
+```
+
+---
+
+## 🔒 Fitur Keamanan
+
+- 📜 **Immutable Records** – Sertifikat disimpan di blockchain
+- 🔍 **Cryptographic Proofs** – Verifikasi menggunakan ZKP
+- 📂 **Decentralized Storage** – File sertifikat tersimpan di IPFS
+- 🧑‍💻 **Identity Verification** – Internet Identity untuk login aman
+
+---
 
 To get started, you might want to explore the project directory structure and the default configuration file. Working with this project in your development environment will not affect any production deployment or identity tokens.
 
