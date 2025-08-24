@@ -52,14 +52,14 @@ export const CertificateProvider: React.FC<CertificateProviderProps> = ({
   const { actor, user } = useAuth();
 
   const pinata = new PinataSDK({
-    pinataJwt: process.env.REACT_APP_PINATA_JWT || "",
-    pinataGateway: process.env.REACT_APP_PINATA_GATEWAY || "",
+    pinataJwt: import.meta.env.VITE_PINATA_JWT || "",
+    pinataGateway: import.meta.env.VITE_GATEWAY_URL || "",
   });
 
   const uploadToIPFS = async (file: File): Promise<string> => {
     try {
-      const upload = await pinata.upload.file(file);
-      return upload.IpfsHash;
+      const upload = await pinata.upload.public.file(file);
+      return upload.cid;
     } catch (error) {
       console.error("IPFS upload failed:", error);
       throw error;
@@ -67,8 +67,6 @@ export const CertificateProvider: React.FC<CertificateProviderProps> = ({
   };
 
   const generateZKProof = async (certificateData: any): Promise<string> => {
-    // Simplified ZK proof generation
-    // In production, use proper ZK libraries like snarkjs
     const dataString = JSON.stringify(certificateData);
     const encoder = new TextEncoder();
     const data = encoder.encode(dataString);
@@ -109,6 +107,8 @@ export const CertificateProvider: React.FC<CertificateProviderProps> = ({
         zkProof,
         JSON.stringify(data.metadata)
       );
+
+      console.log(result);
 
       if ("err" in result) {
         throw new Error(result.err);

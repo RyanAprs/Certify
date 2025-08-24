@@ -15,8 +15,6 @@ import { canisterId as CANISTER_ID_BACKEND } from "../../../declarations/Certify
 
 const DFX_NETWORK = import.meta.env.VITE_DFX_NETWORK || "local";
 
-console.log(CANISTER_ID_BACKEND);
-
 interface User {
   id: Principal;
   role: "Issuer" | "Holder" | "Verifier";
@@ -25,12 +23,17 @@ interface User {
   registeredAt: bigint;
 }
 
+interface GetUserResult {
+  ok?: User;
+  err?: string;
+}
+
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   actor: any;
   loading: boolean;
-  login: () => Promise<void>;
+  login: () => Promise<boolean>;
   logout: () => Promise<void>;
   registerUser: (
     name: string,
@@ -69,63 +72,92 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const client = await AuthClient.create();
       setAuthClient(client);
 
-      if (await client.isAuthenticated()) {
+      const authenticated = await client.isAuthenticated();
+
+      if (authenticated) {
+        // User is authenticated, check if they exist in the backend
         await handleAuthenticated(client);
+      } else {
+        // User is not authenticated, stop loading
+        setLoading(false);
       }
     } catch (error) {
       console.error("Auth initialization failed:", error);
-    } finally {
       setLoading(false);
     }
   };
 
-  const handleAuthenticated = async (client: AuthClient) => {
-    const identity = client.getIdentity();
-    const agent = new HttpAgent({ identity });
-
-    if (DFX_NETWORK === "local") {
-      try {
-        await agent.fetchRootKey();
-      } catch (error) {
-        console.warn("Failed to fetch root key:", error);
-      }
-    }
-
-    const actorInstance = Actor.createActor(idlFactory, {
-      agent,
-      canisterId: CANISTER_ID_BACKEND,
-    });
-
-    setActor(actorInstance);
-    setIsAuthenticated(true);
-
+  const handleAuthenticated = async (client: AuthClient): Promise<boolean> => {
     try {
-      const result = await actorInstance.getUser();
+      const identity = client.getIdentity();
+      const agent = new HttpAgent({ identity });
 
-      console.log(result);
+      if (DFX_NETWORK === "local") {
+        try {
+          await agent.fetchRootKey();
+        } catch (error) {
+          console.warn("Failed to fetch root key:", error);
+        }
+      }
 
-      if ("ok" in result) {
-        setUser(result.ok);
+      const actorInstance = Actor.createActor(idlFactory, {
+        agent,
+        canisterId: CANISTER_ID_BACKEND,
+      });
+
+      setActor(actorInstance);
+      setIsAuthenticated(true);
+
+      try {
+        const result = (await actorInstance.getUser()) as GetUserResult;
+
+        console.log("User fetch result:", result);
+
+        if ("ok" in result) {
+          setUser(result.ok!);
+          return true; // User exists
+        } else if ("err" in result) {
+          console.error("User fetch error:", result.err);
+          setUser(null);
+          return false; // User doesn't exist
+        }
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+        setUser(null);
+        return false; // User doesn't exist or error occurred
       }
     } catch (error) {
-      console.error("Failed to fetch user:", error);
+      console.error("Authentication handling failed:", error);
+      return false;
+    } finally {
+      setLoading(false);
     }
+
+    return false;
   };
 
-  const login = async () => {
-    if (!authClient) return;
+  const login = async (): Promise<boolean> => {
+    if (!authClient) return false;
 
-    try {
-      await authClient.login({
+    return new Promise((resolve, reject) => {
+      authClient.login({
         identityProvider:
           DFX_NETWORK === "local"
             ? `http://${CANISTER_ID_INTERNET_IDENTITY}.localhost:4943/`
             : "https://identity.ic0.app",
-        onSuccess: () => handleAuthenticated(authClient),
+        onSuccess: async () => {
+          try {
+            const userExists = await handleAuthenticated(authClient);
+            resolve(userExists);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onError: (error) => {
+          reject(error);
+        },
       });
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
+    });
   };
 
   const logout = async () => {

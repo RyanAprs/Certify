@@ -41,4 +41,5 @@ module {
         joinedAt: Int;
         isActive: Bool;
     };
+
 }

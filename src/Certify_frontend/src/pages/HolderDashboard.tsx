@@ -67,20 +67,23 @@ const IssuerDashboard: React.FC = () => {
   const [totalUser, setTotalUser] = useState(0);
   const [totalCertificate, setTotalCertificate] = useState(0);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [certificatesLoading, setCertificatesLoading] = useState(true);
 
   const getAllCertificates = async () => {
-    setCertificatesLoading(true);
     try {
-      const principalId = Principal.fromText(id);
-      const res = await actor.getCertificatesByIssuerId(principalId);
-      setCertificates(res.ok);
+      const res = await actor.getAllCertificates();
       console.log("sertif:", res);
+
+      if (Array.isArray(res)) {
+        setCertificates(res);
+      } else if (res === null || res === undefined) {
+        setCertificates([]);
+      } else {
+        console.warn("getAllCertificates did not return an array:", res);
+        setCertificates([]);
+      }
     } catch (err) {
       console.error("Error getAllCertificates:", err);
       setCertificates([]);
-    } finally {
-      setCertificatesLoading(false);
     }
   };
 
@@ -186,7 +189,6 @@ const IssuerDashboard: React.FC = () => {
         setIsCopied(false);
       }, 2000);
     } catch (err) {
-      console.log(err);
       toast.error("Failed to copy User ID");
     }
   };
@@ -194,29 +196,6 @@ const IssuerDashboard: React.FC = () => {
   const openCertificateImage = (ipfsHash: string) => {
     const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
     window.open(imageUrl, "_blank");
-  };
-
-  // Helper function to safely convert holder to string and truncate
-  const formatHolder = (holder: any): string => {
-    try {
-      const holderString =
-        typeof holder === "string" ? holder : holder.toString();
-      return holderString.slice(0, 10) + "...";
-    } catch (error) {
-      console.error("Error formatting holder:", error);
-      return "Unknown holder";
-    }
-  };
-
-  // Helper function to copy text to clipboard
-  const copyToClipboard = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(`${label} copied to clipboard!`);
-    } catch (err) {
-      console.log(err);
-      toast.error(`Failed to copy ${label}`);
-    }
   };
 
   return (
@@ -458,62 +437,41 @@ const IssuerDashboard: React.FC = () => {
 
         {/* Certificates Display */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {certificatesLoading ? (
-            // Loading state
-            <div className="col-span-full">
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-gray-500">Loading certificates...</p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : certificates &&
-            Array.isArray(certificates) &&
-            certificates.length > 0 ? (
+          {certificates && certificates.length > 0 ? (
             certificates.map((certificate) => (
-              <Card
-                key={certificate.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow duration-200"
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-semibold text-gray-900">
-                    {certificate.title}
-                  </CardTitle>
-                  <CardDescription className="text-sm text-gray-600">
-                    Issued to: {formatHolder(certificate.holder)}
+              <Card key={certificate.id} className="overflow-hidden">
+                <CardHeader>
+                  <CardTitle className="text-lg">{certificate.title}</CardTitle>
+                  <CardDescription>
+                    Issued to: {certificate.holder.slice(0, 10)}...
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Certificate Image */}
                   {certificate.ipfsHash && (
-                    <div className="relative group">
+                    <div className="relative">
                       <img
                         src={`https://gateway.pinata.cloud/ipfs/${certificate.ipfsHash}`}
                         alt={certificate.title}
-                        className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity duration-200 border border-gray-200"
+                        className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() =>
                           openCertificateImage(certificate.ipfsHash)
                         }
                         onError={(e) => {
-                          // Handle image load error
                           const target = e.target as HTMLImageElement;
                           target.style.display = "none";
                           target.nextElementSibling?.classList.remove("hidden");
                         }}
                       />
-                      {/* Fallback for failed image load */}
-                      <div className=" w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                      <div className=" w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
                         <div className="text-center text-gray-500">
                           <FileText className="h-8 w-8 mx-auto mb-2" />
                           <p className="text-sm">Image not available</p>
                         </div>
                       </div>
-                      {/* View full image button */}
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 hover:bg-white border shadow-sm"
+                        className="absolute top-2 right-2 opacity-80 hover:opacity-100"
                         onClick={() =>
                           openCertificateImage(certificate.ipfsHash)
                         }
@@ -523,96 +481,32 @@ const IssuerDashboard: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Description */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {certificate.description || "No description provided"}
-                    </p>
-                  </div>
+                  <p className="text-sm text-gray-600">
+                    {certificate.description}
+                  </p>
 
-                  {/* Certificate Details */}
-                  <div className="space-y-3 border-t pt-3">
-                    {/* Certificate ID */}
-                    <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-blue-800 mb-1">
-                          Certificate ID
-                        </p>
-                        <p className="text-xs text-blue-600 font-mono truncate">
-                          {certificate.id}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="ml-2 h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                        onClick={() =>
-                          copyToClipboard(certificate.id, "Certificate ID")
-                        }
-                        title="Copy Certificate ID"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
+                  {certificate.metadata && (
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p>
+                        <strong>Metadata:</strong> {certificate.metadata}
+                      </p>
                     </div>
+                  )}
 
-                    {/* ZK Proof */}
-                    {certificate.zkProof && (
-                      <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-green-800 mb-1">
-                            ZK Proof
-                          </p>
-                          <p className="text-xs text-green-600 font-mono truncate">
-                            {certificate.zkProof}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-2 h-8 w-8 p-0 text-green-600 hover:text-green-800 hover:bg-green-100"
-                          onClick={() =>
-                            copyToClipboard(certificate.zkProof, "ZK Proof")
-                          }
-                          title="Copy ZK Proof"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Metadata */}
-                    {certificate.metadata && (
-                      <div className="p-2 bg-gray-50 rounded-lg">
-                        <p className="text-xs font-medium text-gray-800 mb-1">
-                          Metadata
-                        </p>
-                        <p className="text-xs text-gray-600 break-words">
-                          {certificate.metadata}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer with date and status */}
-                  <div className="flex justify-between items-center pt-3 border-t">
-                    <div className="text-xs text-gray-500">
-                      <span className="font-medium">Issued: </span>
+                  <div className="flex justify-between items-center text-xs text-gray-500">
+                    <span>
                       {new Date(
                         Number(certificate.issuedAt) / 1000000
-                      ).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </div>
+                      ).toLocaleDateString()}
+                    </span>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      className={`px-2 py-1 rounded-full ${
                         certificate.isValid
-                          ? "bg-green-100 text-green-800 border border-green-200"
-                          : "bg-red-100 text-red-800 border border-red-200"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
                       }`}
                     >
-                      {certificate.isValid ? "✓ Valid" : "✗ Invalid"}
+                      {certificate.isValid ? "Valid" : "Invalid"}
                     </span>
                   </div>
                 </CardContent>
