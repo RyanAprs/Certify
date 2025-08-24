@@ -502,14 +502,6 @@ const IssuerDashboard: React.FC = () => {
                           target.nextElementSibling?.classList.remove("hidden");
                         }}
                       />
-                      {/* Fallback for failed image load */}
-                      <div className=" w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                        <div className="text-center text-gray-500">
-                          <FileText className="h-8 w-8 mx-auto mb-2" />
-                          <p className="text-sm">Image not available</p>
-                        </div>
-                      </div>
-                      {/* View full image button */}
                       <Button
                         size="sm"
                         variant="secondary"

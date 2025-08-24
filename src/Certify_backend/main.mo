@@ -174,59 +174,32 @@ actor CertifyBackend {
         count
     };
 
-    // Fungsi untuk mengecek apakah user adalah member dari issuer tertentu
-    public query func isMemberOfIssuer(issuerId: Types.UserId, holderId: Types.UserId) : async Bool {
-        for ((key, member) in memberships.entries()) {
-            if (Principal.equal(member.issuerId, issuerId) and 
-                Principal.equal(member.holderId, holderId) and 
-                member.isActive) {
-                return true;
-            };
-        };
-        false
+    // Fungsi untuk mendapatkan semua issuer yang diikuti oleh holder tertentu
+    public type MembershipResult = {
+        isMember: Bool;
+        issuerIds: [Types.UserId];
     };
 
-    // Fungsi untuk mendapatkan statistik lengkap issuer
-    public query func getIssuerStatistics(issuerId: Types.UserId) : async Result.Result<{
-        totalMembers: Nat;
-        activeMembers: Nat;
-        totalCertificates: Nat;
-        validCertificates: Nat;
-    }, Text> {
+    // Fungsi untuk mengecek membership dan mendapatkan semua issuer yang diikuti oleh holder
+    public query func checkMembershipByHolderId(holderId: Types.UserId) : async MembershipResult {
+        let buffer = Buffer.Buffer<Types.UserId>(0);
         
-        var totalMembers = 0;
-        var activeMembers = 0;
-        var totalCertificates = 0;
-        var validCertificates = 0;
-        
-        // Hitung members
+        // Loop melalui semua membership untuk mencari yang sesuai dengan holderId
         for ((key, member) in memberships.entries()) {
-            if (Principal.equal(member.issuerId, issuerId)) {
-                totalMembers += 1;
-                if (member.isActive) {
-                    activeMembers += 1;
-                };
+            if (Principal.equal(member.holderId, holderId)) {
+                buffer.add(member.issuerId);
             };
         };
         
-        // Hitung certificates
-        for ((id, certificate) in certificates.entries()) {
-            if (Principal.equal(certificate.issuer, issuerId)) {
-                totalCertificates += 1;
-                if (certificate.isValid) {
-                    validCertificates += 1;
-                };
-            };
-        };
+        let issuerIds = Buffer.toArray(buffer);
+        let isMember = issuerIds.size() > 0;
         
-        #ok({
-            totalMembers = totalMembers;
-            activeMembers = activeMembers;
-            totalCertificates = totalCertificates;
-            validCertificates = validCertificates;
-        })
+        {
+            isMember = isMember;
+            issuerIds = issuerIds;
+        }
     };
-
+    
     // GET MEMBERS BY ISSUER ID
     // public shared (msg) func getMemberByIssuer(
     //     issuerId: Principal
