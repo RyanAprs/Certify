@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import {
@@ -15,9 +15,10 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Shield, CheckCircle, XCircle, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { useCertificate } from "@/contexts/Certification";
+import { Principal } from "@dfinity/principal";
 
 const VerifierDashboard: React.FC = () => {
-  const { actor } = useAuth();
+  const { actor, user } = useAuth();
   const { verifyCertificate } = useCertificate();
   const [verificationData, setVerificationData] = useState({
     certificateId: "",
@@ -30,6 +31,12 @@ const VerifierDashboard: React.FC = () => {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [id, setId] = useState<string>("");
+  const [issuerId, setIssuerId] = useState<string>("");
+  const [issuerName, setIssuerName] = useState<string>("");
+  const [holderId, setHolderId] = useState<string>("");
+  const [holderName, setHolderName] = useState<string>("");
+  const [loadingPage, setLoadingPage] = useState(false);
 
   const availableFields = [
     { id: "title", label: "Certificate Title" },
@@ -39,6 +46,13 @@ const VerifierDashboard: React.FC = () => {
     { id: "issuedAt", label: "Issue Date" },
     { id: "metadata", label: "Additional Metadata" },
   ];
+
+  useEffect(() => {
+    if (user?.id) {
+      const userId = typeof user.id === "string" ? user.id : user.id.toString();
+      setId(userId);
+    }
+  }, [user]);
 
   const handleVerification = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +81,9 @@ const VerifierDashboard: React.FC = () => {
             certificate: result.ok,
             selectedFields,
           });
+          setIssuerId(result.ok.issuer.toString());
+          setHolderId(result.ok.holder.toString());
+
           toast.success("Certificate verified successfully!");
         } else {
           toast.error("Certificate not found");
@@ -86,6 +103,33 @@ const VerifierDashboard: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const getMemberDetail = async () => {
+    setLoadingPage(true);
+    try {
+      if (!issuerId || !holderId) {
+        console.warn("IssuerId or HolderId is missing");
+        return;
+      }
+
+      const issuerPrincipal = Principal.fromText(issuerId);
+      const resIssuer = await actor.getUserById(issuerPrincipal);
+      setIssuerName(resIssuer.ok.name);
+
+      const holderPrincipal = Principal.fromText(holderId);
+      const resHolder = await actor.getUserById(holderPrincipal);
+      setHolderName(resHolder.ok.name);
+    } catch (error) {
+      console.error("getMemberDetail error:", error);
+    } finally {
+      setLoadingPage(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!id) return;
+    getMemberDetail();
+  }, [id, issuerId, holderId]);
 
   const handleFieldToggle = (fieldId: string) => {
     setSelectedFields((prev) =>
@@ -107,9 +151,9 @@ const VerifierDashboard: React.FC = () => {
       case "description":
         return certificate.description;
       case "issuer":
-        return `${certificate.issuer.slice(0, 10)}...`;
+        return `${issuerName}`;
       case "holder":
-        return `${certificate.holder.slice(0, 10)}...`;
+        return `${holderName}`;
       case "issuedAt":
         return new Date(
           Number(certificate.issuedAt) / 1000000
@@ -133,6 +177,15 @@ const VerifierDashboard: React.FC = () => {
         return "N/A";
     }
   };
+
+  if (loadingPage) {
+    return (
+      <div className="min-h-screen w-full bg-white flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
