@@ -47,7 +47,8 @@ const HolderDashboard: React.FC = () => {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [certificatesLoading, setCertificatesLoading] = useState(true);
   const [isMember, setIsMember] = useState<boolean | null>(null);
-  const [memberId, setMemberId] = useState();
+  const [memberId, setMemberId] = useState<string>("");
+  const [memberName, setMemberName] = useState<string>("");
 
   const getCertificatesByHolderId = async () => {
     setCertificatesLoading(true);
@@ -73,8 +74,8 @@ const HolderDashboard: React.FC = () => {
       const res = await actor.checkMembershipByHolderId(principalId);
       console.log(res);
 
-      // const issuerId = res.issuerIds.toString();
-      // setMemberId(res.issuerIds);
+      const issuerId = res.issuerIds.toString();
+      setMemberId(issuerId);
 
       if (res.isMember) {
         setIsMember(true);
@@ -91,8 +92,9 @@ const HolderDashboard: React.FC = () => {
   const getMemberDetail = async () => {
     setLoadingPage(true);
     try {
-      const res = await actor.getUserById(memberId);
-      console.log(res);
+      const principalId = Principal.fromText(memberId);
+      const res = await actor.getUserById(principalId);
+      setMemberName(res.ok.name);
     } catch (error) {
       console.log(error);
     } finally {
@@ -238,7 +240,7 @@ const HolderDashboard: React.FC = () => {
                 )}
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Member:</span>
-                  <span>Test</span>
+                  <span>{memberName}</span>
                 </div>
               </div>
             </CardContent>
