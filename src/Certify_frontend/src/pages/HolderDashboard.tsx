@@ -40,9 +40,7 @@ const HolderDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loadingPage, setLoadingPage] = useState(false);
   const { actor, user } = useAuth();
-  const [formData, setFormData] = useState({
-    issuerId: "",
-  });
+  const [issuerId, setIssuerId] = useState<string>("");
   const [id, setId] = useState<string>("");
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [certificatesLoading, setCertificatesLoading] = useState(true);
@@ -119,30 +117,19 @@ const HolderDashboard: React.FC = () => {
   const handleJoinMember = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    let holderPrincipal: Principal;
-    try {
-      holderPrincipal = Principal.fromText(formData.issuerId);
-    } catch (err) {
-      console.log(err);
-      toast.error("Invalid holder Principal ID");
-      return;
-    }
-
     try {
       setLoading(true);
-      await actor.joinIssuer({
-        issuerId: holderPrincipal,
-      });
+      const issuerPrincipal = Principal.fromText(issuerId);
+
+      await actor.joinIssuer(issuerPrincipal);
       toast.success("Joined successfully!");
       setIsDialogOpen(false);
-      setFormData({
-        issuerId: "",
-      });
+      setIssuerId("");
       checkMember();
       getCertificatesByHolderId();
     } catch (error) {
       console.error(error);
-      toast.error("Failed to issue certificate");
+      toast.error("Failed to join issuer");
     } finally {
       setLoading(false);
     }
@@ -268,13 +255,8 @@ const HolderDashboard: React.FC = () => {
                     <Label htmlFor="issuerId">Issuer ID (Principal)</Label>
                     <Input
                       id="issuerId"
-                      value={formData.issuerId}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          issuerId: e.target.value,
-                        }))
-                      }
+                      value={issuerId}
+                      onChange={(e) => setIssuerId(e.target.value)}
                       placeholder="Enter issuer's principal ID"
                       required
                     />
