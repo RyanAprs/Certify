@@ -146,7 +146,17 @@ Script ini akan:
 - Build backend dan frontend
 - Setup PM2 ecosystem file
 
-### Langkah 3: Konfigurasi Environment Variables
+### Langkah 3: Deployment Contracts
+
+```
+cd contracts
+cp .env.example .env
+npm install
+npx hardhat compile
+npx hardhat run scripts/deploy.ts --network localhost
+```
+
+### Langkah 4: Konfigurasi Environment Variables
 
 **Backend:**
 
@@ -176,242 +186,29 @@ nano .env
 Isi dengan konfigurasi yang sesuai:
 
 ```env
-VITE_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
-VITE_CONTRACT_ADDRESS=0x...
-VITE_VERIFIER_ADDRESS=0x...
+VITE_RPC_URL=http://127.0.0.1:8545
+VITE_CONTRACT_ADDRESS=0x... (From contracts)
+VITE_VERIFIER_ADDRESS=0x... (From contracts)
 VITE_IPFS_PROJECT_ID=YOUR_ID
 VITE_IPFS_PROJECT_SECRET=YOUR_SECRET
 VITE_API_BASE_URL=http://localhost:4000
 VITE_WALLETCONNECT_ID=wc_demo
 ```
 
-### Langkah 4: Rebuild Frontend (jika env berubah)
+### Langkah 5: Run
+
+**Backend:**
+
+```bash
+cd backend
+npm run dev
+```
+
+**Frontend:**
 
 ```bash
 cd frontend
-npm run build
+npm run dev
 ```
 
-### Langkah 5: Start Services dengan PM2
-
-```bash
-cd ~/Certify
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-```
-
-Perintah terakhir akan memberikan instruksi untuk enable PM2 pada boot.
-
-### Manajemen Services
-
-```bash
-# Lihat status
-pm2 status
-
-# Lihat logs
-pm2 logs certify-backend
-
-# Restart
-pm2 restart certify-backend
-
-# Stop
-pm2 stop certify-backend
-
-# Monitor
-pm2 monit
-```
-
-### Update Nginx Config (jika perlu)
-
-```bash
-sudo nano /etc/nginx/sites-available/certify
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
----
-
-## Konfigurasi Network
-
-### Akses dari Jaringan Lokal
-
-Setelah instalasi, aplikasi dapat diakses dari perangkat lain di jaringan yang sama:
-
-```
-http://<raspberry-pi-ip-address>
-```
-
-Untuk mengetahui IP address Raspberry Pi:
-
-```bash
-hostname -I
-```
-
-### Akses dari Internet (Opsional)
-
-Jika ingin mengakses dari internet, perlu setup:
-
-1. Port forwarding di router (port 80)
-2. Dynamic DNS (jika IP dinamis)
-3. SSL certificate (Let's Encrypt) untuk HTTPS
-
-**Setup HTTPS dengan Let's Encrypt:**
-
-```bash
-sudo apt-get install certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com
-```
-
----
-
-## Troubleshooting
-
-### Port 80 sudah digunakan
-
-```bash
-# Cek proses yang menggunakan port 80
-sudo lsof -i :80
-
-# Atau ubah port di nginx config
-sudo nano /etc/nginx/sites-available/certify
-# Ubah listen 80 menjadi listen 8080
-```
-
-### Backend tidak bisa start
-
-```bash
-# Cek logs
-pm2 logs certify-backend
-# atau
-docker compose logs backend
-
-# Cek apakah port 4000 tersedia
-sudo lsof -i :4000
-```
-
-### Frontend tidak load
-
-```bash
-# Cek nginx status
-sudo systemctl status nginx
-
-# Cek nginx logs
-sudo tail -f /var/log/nginx/error.log
-
-# Pastikan build folder ada
-ls -la frontend/dist
-```
-
-### Memory issues
-
-Raspberry Pi dengan RAM terbatas mungkin perlu swap:
-
-```bash
-# Cek swap
-free -h
-
-# Tambah swap (jika perlu)
-sudo dphys-swapfile swapoff
-sudo nano /etc/dphys-swapfile
-# Ubah CONF_SWAPSIZE=100 menjadi 2048
-sudo dphys-swapfile setup
-sudo dphys-swapfile swapon
-```
-
-### Docker permission denied
-
-```bash
-sudo usermod -aG docker $USER
-# Log out dan log in kembali
-```
-
----
-
-## Monitoring & Maintenance
-
-### Auto-restart on Reboot
-
-**Docker:**
-
-```bash
-# Docker Compose sudah auto-restart dengan restart: unless-stopped
-# Pastikan Docker service enabled
-sudo systemctl enable docker
-```
-
-**PM2:**
-
-```bash
-pm2 startup
-# Ikuti instruksi yang diberikan
-```
-
-### Backup
-
-```bash
-# Backup database/config (jika ada)
-# Backup .env files
-tar -czf certify-backup-$(date +%Y%m%d).tar.gz \
-  backend/.env \
-  frontend/.env \
-  ecosystem.config.js
-```
-
-### Update
-
-**Docker:**
-
-```bash
-git pull
-docker compose down
-docker compose up -d --build
-```
-
-**Manual:**
-
-```bash
-git pull
-cd backend && npm install && npm run build
-cd ../frontend && npm install && npm run build
-pm2 restart certify-backend
-sudo systemctl restart nginx
-```
-
----
-
-## Performance Tips
-
-1. **Gunakan SSD** untuk storage (jika memungkinkan)
-2. **Overclock** Raspberry Pi (dengan cooling yang memadai)
-3. **Disable services** yang tidak diperlukan
-4. **Monitor resource** dengan `htop` atau `pm2 monit`
-5. **Gunakan reverse proxy** (nginx) untuk caching static files
-
----
-
-## Keamanan
-
-1. **Ubah default password** Raspberry Pi
-2. **Setup firewall** (ufw):
-   ```bash
-   sudo ufw allow 80/tcp
-   sudo ufw allow 22/tcp
-   sudo ufw enable
-   ```
-3. **Gunakan HTTPS** untuk production
-4. **Rotate SESSION_SECRET** secara berkala
-5. **Update sistem** secara rutin:
-   ```bash
-   sudo apt-get update && sudo apt-get upgrade
-   ```
-
----
-
-## Support
-
-Jika mengalami masalah:
-
-1. Cek logs (PM2 atau Docker)
-2. Cek dokumentasi di `docs/`
-3. Cek GitHub issues (jika ada)
+buka di browser `http://localhost:5173/`
