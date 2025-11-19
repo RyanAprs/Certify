@@ -64,7 +64,6 @@ Ada dua cara untuk menginstall Certify di Raspberry Pi:
 ### Langkah 1: Clone Repository
 
 ```bash
-cd ~
 git clone https://github.com/RyanAprs/Certify.git
 cd Certify
 ```
@@ -126,7 +125,6 @@ docker compose up -d --build
 ### Langkah 1: Clone Repository
 
 ```bash
-cd ~
 git clone https://github.com/RyanAprs/Certify.git
 cd Certify
 ```
