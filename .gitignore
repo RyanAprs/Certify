@@ -1,0 +1,13 @@
+node_modules
+.env
+contracts/.env
+frontend/.env
+backend/.env
+dist
+artifacts
+cache
+coverage
+.DS_Store
+logs
+ecosystem.config.js
+*.log

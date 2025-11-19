@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: certify-backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - FRONTEND_URL=http://localhost:80
+      - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+    restart: unless-stopped
+    networks:
+      - certify-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: certify-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - certify-network
+
+networks:
+  certify-network:
+    driver: bridge
