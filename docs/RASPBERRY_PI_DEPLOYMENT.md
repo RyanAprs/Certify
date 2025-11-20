@@ -197,6 +197,15 @@ VITE_WALLETCONNECT_ID=wc_demo
 
 ### Langkah 5: Run
 
+**Contracts:**
+
+```bash
+cd contracts
+npx hardhat node
+```
+
+Copy private key untuk login
+
 **Backend:**
 
 ```bash
