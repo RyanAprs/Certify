@@ -73,31 +73,80 @@ export const IssuerDashboard = () => {
         (l) => l.args.issuer.toLowerCase() === address.toLowerCase()
       );
 
-      const holders = forMe.map((l) => l.args.holder);
+      const holders = [
+        ...new Set(forMe.map((l) => l.args.holder.toLowerCase())),
+      ];
 
-      console.log("current block", await publicClient.getBlockNumber());
-      console.log("contract", CERTIFY_CONTRACT_ADDRESS);
-      console.log("my address", address);
-      console.log("all MemberRequested logs", logs);
-      console.log("filtered forMe", forMe);
-      console.log("holders", holders);
+      console.log("=== DEBUG START ===");
+      console.log("Unique holders:", holders);
 
       const results = await Promise.all(
         holders.map(async (holder) => {
-          const req = await publicClient.readContract({
-            address: CERTIFY_CONTRACT_ADDRESS,
-            abi: CERTIFY_ABI,
-            functionName: "memberRequests",
-            args: [address, holder],
-          });
-          return { holder, decided: req.decided, approved: req.approved };
+          try {
+            const req = await publicClient.readContract({
+              address: CERTIFY_CONTRACT_ADDRESS,
+              abi: CERTIFY_ABI,
+              functionName: "memberRequests",
+              args: [address, holder as `0x${string}`],
+            });
+
+            console.log(`RAW response for ${holder}:`, req);
+            console.log(`Type:`, typeof req, `IsArray:`, Array.isArray(req));
+
+            // Handle both array and object responses
+            let applicant, approved, decided;
+
+            if (Array.isArray(req)) {
+              // If returned as array: [applicant, approved, decided]
+              [applicant, approved, decided] = req;
+            } else if (typeof req === "object" && req !== null) {
+              // If returned as object
+              applicant = req.applicant;
+              approved = req.approved;
+              decided = req.decided;
+            } else {
+              console.error(`Unexpected response type for ${holder}`);
+              return null;
+            }
+
+            console.log(`Holder: ${holder}`);
+            console.log(`  - applicant: ${applicant}`);
+            console.log(`  - approved: ${approved}`);
+            console.log(`  - decided: ${decided}`);
+
+            return {
+              holder,
+              decided: Boolean(decided),
+              approved: Boolean(approved),
+            };
+          } catch (error) {
+            console.error(`Error reading request for ${holder}:`, error);
+            return null;
+          }
         })
       );
 
-      setRequests(results.filter((r) => !r.decided).map((r) => r.holder));
-      setMembers(results.filter((r) => r.approved).map((r) => r.holder));
+      // Filter out null results
+      const validResults = results.filter((r) => r !== null);
+
+      console.log("All results:", validResults);
+
+      const pendingList = validResults
+        .filter((r) => !r.decided)
+        .map((r) => r.holder);
+
+      const membersList = validResults
+        .filter((r) => r.decided && r.approved)
+        .map((r) => r.holder);
+
+      console.log("Pending:", pendingList);
+      console.log("Members:", membersList);
+      console.log("=== DEBUG END ===");
+
+      setRequests(pendingList);
+      setMembers(membersList);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching:", err);
       alert("Gagal load member");
     } finally {
       setIsLoadingMembers(false);
@@ -158,6 +207,7 @@ export const IssuerDashboard = () => {
     if (!account) return alert("Set private key first");
     try {
       setProcessingHolder(holder);
+
       const hash = await walletClient.writeContract({
         address: CERTIFY_CONTRACT_ADDRESS,
         abi: CERTIFY_ABI,
@@ -165,19 +215,20 @@ export const IssuerDashboard = () => {
         args: [holder as `0x${string}`, approve],
         account,
       });
+
+      console.log("Transaction hash:", hash);
+
+      // Tunggu konfirmasi
       await publicClient.waitForTransactionReceipt({ hash });
 
-      // --- update state lokal ---
-      if (approve) {
-        setMembers((prev) =>
-          prev.includes(holder) ? prev : [...prev, holder]
-        );
-      }
-      removeFromPending(holder);
-      // --------------------------------
+      console.log("Transaction confirmed, refreshing data...");
+
+      // Refresh data dari blockchain (PENTING!)
+      await fetchRequestsAndMembers();
+
       alert(approve ? "Member approved!" : "Member rejected!");
     } catch (error) {
-      console.error(error);
+      console.error("Error:", error);
       alert("Failed to process decision");
     } finally {
       setProcessingHolder(null);

@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useHolderCertificates } from "../hooks/useCertificates";
 import { CertificateCard } from "./Shared";
-import { keccak256, toBytes, encodePacked } from "viem";
+import { keccak256, toBytes, encodePacked, parseAbiItem } from "viem";
 import { uploadJson } from "../lib/ipfs";
 import { useEffect, useState } from "react";
 import { useLocalAccount } from "../hooks/useLocalAccount";
@@ -10,6 +10,7 @@ import {
   CERTIFY_CONTRACT_ADDRESS,
   CERTIFY_ABI,
   walletClient,
+  publicClient,
 } from "../lib/viemLocal";
 
 interface MembershipForm {
