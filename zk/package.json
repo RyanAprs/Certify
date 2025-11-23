@@ -33,6 +33,8 @@
     "check-types": "^11.2.3",
     "chokidar": "^3.5.1",
     "circom_runtime": "^0.1.12",
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
     "cliui": "^6.0.0",
     "color-convert": "^2.0.1",
     "color-name": "^1.1.4",

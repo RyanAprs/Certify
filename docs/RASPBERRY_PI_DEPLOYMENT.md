@@ -187,12 +187,13 @@ Isi dengan konfigurasi yang sesuai:
 
 ```env
 VITE_RPC_URL=http://127.0.0.1:8545
-VITE_CONTRACT_ADDRESS=0x... (From contracts)
-VITE_VERIFIER_ADDRESS=0x... (From contracts)
-VITE_IPFS_PROJECT_ID=YOUR_ID
-VITE_IPFS_PROJECT_SECRET=YOUR_SECRET
-VITE_API_BASE_URL=http://localhost:4000
-VITE_WALLETCONNECT_ID=wc_demo
+VITE_WALLETCONNECT_ID="wc_demo"
+VITE_CONTRACT_ADDRESS="0xYourContract"
+VITE_VERIFIER_ADDRESS="0xYourVerifier"
+VITE_ZKEY_URL="/zk/certify.zkey"
+VITE_WASM_URL="/zk/certify.wasm"
+VITE_PINATA_JWT="YOUR_PINATA_JWT"
+VITE_GATEWAY_URL="your-gateway.mypinata.cloud"
 ```
 
 ### Langkah 5: Run

@@ -12,6 +12,14 @@ import {
 } from "../lib/viemLocal";
 import { useEffect, useState } from "react";
 
+/* ---------- ZK imports ---------- */
+import {
+  generateGpaProof,
+  formatProofForSolidity,
+  ZKProof,
+  CertificateMetadata,
+} from "../lib/zkp";
+
 interface IssueForm {
   holder: string;
   name: string;
@@ -22,22 +30,25 @@ interface IssueForm {
   image: FileList;
 }
 
-interface MemberDecisionForm {
-  holder: string;
-  approve: boolean;
-}
-
 export const IssuerDashboard = () => {
   const { account, address, handleSetPrivateKey } = useLocalAccount();
   const { data: certificates, refetch } = useIssuerCertificates(
     address as `0x${string}`
   );
+
+  /* ---------- existing states ---------- */
   const [privateKeyInput, setPrivateKeyInput] = useState("");
   const [requests, setRequests] = useState<string[]>([]);
   const [members, setMembers] = useState<string[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [processingHolder, setProcessingHolder] = useState<string | null>(null);
+
+  /* ---------- ZK states ---------- */
+  const [zkProof, setZkProof] = useState<ZKProof | null>(null);
+  const [zkLoading, setZkLoading] = useState(false);
+  const [zkError, setZkError] = useState<string | null>(null);
+  const [minGpa] = useState("3.00"); // bisa diubah sesuai kebutuhan
 
   const issueForm = useForm<IssueForm>({
     defaultValues: {
@@ -50,15 +61,11 @@ export const IssuerDashboard = () => {
     },
   });
 
-  const decisionForm = useForm<MemberDecisionForm>({
-    defaultValues: { holder: "", approve: true },
-  });
-
+  /* ---------- existing logic (fetchRequestsAndMembers, onApprove) ---------- */
   const fetchRequestsAndMembers = async () => {
     if (!address) return;
+    setIsLoadingMembers(true);
     try {
-      setIsLoadingMembers(true);
-
       const current = await publicClient.getBlockNumber();
       const logs = await publicClient.getLogs({
         address: CERTIFY_CONTRACT_ADDRESS,
@@ -77,9 +84,6 @@ export const IssuerDashboard = () => {
         ...new Set(forMe.map((l) => l.args.holder.toLowerCase())),
       ];
 
-      console.log("=== DEBUG START ===");
-      console.log("Unique holders:", holders);
-
       const results = await Promise.all(
         holders.map(async (holder) => {
           try {
@@ -90,85 +94,113 @@ export const IssuerDashboard = () => {
               args: [address, holder as `0x${string}`],
             });
 
-            console.log(`RAW response for ${holder}:`, req);
-            console.log(`Type:`, typeof req, `IsArray:`, Array.isArray(req));
-
-            // Handle both array and object responses
             let applicant, approved, decided;
-
             if (Array.isArray(req)) {
-              // If returned as array: [applicant, approved, decided]
               [applicant, approved, decided] = req;
             } else if (typeof req === "object" && req !== null) {
-              // If returned as object
               applicant = req.applicant;
               approved = req.approved;
               decided = req.decided;
-            } else {
-              console.error(`Unexpected response type for ${holder}`);
-              return null;
-            }
-
-            console.log(`Holder: ${holder}`);
-            console.log(`  - applicant: ${applicant}`);
-            console.log(`  - approved: ${approved}`);
-            console.log(`  - decided: ${decided}`);
+            } else return null;
 
             return {
               holder,
               decided: Boolean(decided),
               approved: Boolean(approved),
             };
-          } catch (error) {
-            console.error(`Error reading request for ${holder}:`, error);
+          } catch {
             return null;
           }
         })
       );
 
-      // Filter out null results
-      const validResults = results.filter((r) => r !== null);
-
-      console.log("All results:", validResults);
-
-      const pendingList = validResults
-        .filter((r) => !r.decided)
-        .map((r) => r.holder);
-
-      const membersList = validResults
-        .filter((r) => r.decided && r.approved)
-        .map((r) => r.holder);
-
-      console.log("Pending:", pendingList);
-      console.log("Members:", membersList);
-      console.log("=== DEBUG END ===");
-
-      setRequests(pendingList);
-      setMembers(membersList);
+      const valid = results.filter((r) => r !== null);
+      setRequests(valid.filter((r) => !r.decided).map((r) => r.holder));
+      setMembers(
+        valid.filter((r) => r.decided && r.approved).map((r) => r.holder)
+      );
     } catch (err) {
-      console.error("Error fetching:", err);
+      console.error(err);
       alert("Gagal load member");
     } finally {
       setIsLoadingMembers(false);
     }
   };
 
-  useEffect(() => {
-    const key = localStorage.getItem("privateKey");
-    if (key) {
-      setPrivateKeyInput(key);
+  const onApprove = async (holder: string, approve: boolean) => {
+    if (!account) return alert("Set private key first");
+    setProcessingHolder(holder);
+    try {
+      const hash = await walletClient.writeContract({
+        address: CERTIFY_CONTRACT_ADDRESS,
+        abi: CERTIFY_ABI,
+        functionName: "manageMember",
+        args: [holder as `0x${string}`, approve],
+        account,
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      await fetchRequestsAndMembers();
+      alert(approve ? "Member approved!" : "Member rejected!");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to process decision");
+    } finally {
+      setProcessingHolder(null);
     }
-    fetchRequestsAndMembers();
-  }, [address]);
+  };
 
+  /* ---------- ZK helpers ---------- */
+  const handleGenerateProof = async (
+    metadata: CertificateMetadata
+  ): Promise<ZKProof | null> => {
+    setZkLoading(true);
+    setZkError(null);
+    try {
+      const proof = await generateGpaProof(metadata, minGpa);
+      setZkProof(proof);
+      return proof;
+    } catch (e: any) {
+      setZkError(e.message);
+      return null;
+    } finally {
+      setZkLoading(false);
+    }
+  };
+
+  const handleVerifyOnChain = async (certificateId: bigint) => {
+    if (!zkProof || !account) return alert("No proof / account");
+    try {
+      const { pA, pB, pC, pubSignals } = formatProofForSolidity(zkProof);
+
+      // pilih fungsi sesuai kontrak
+      const hash = await walletClient.writeContract({
+        address: CERTIFY_CONTRACT_ADDRESS,
+        abi: CERTIFY_ABI,
+        functionName: "verifySelectiveProof", // atau "verifyGpaProof" kalau pakai ZKPCertify
+        args: [certificateId, pA, pB, pC, pubSignals],
+        account,
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      alert("✅ ZK proof verified on-chain!");
+    } catch (e: any) {
+      console.error(e);
+      alert(`On-chain verification failed: ${e.message}`);
+    }
+  };
+
+  /* ---------- issue certificate + ZK ---------- */
   const onIssue = issueForm.handleSubmit(async (values) => {
     if (!account) return alert("Set private key first");
+    setIsIssuing(true);
+    setZkProof(null);
+    setZkError(null);
     try {
-      setIsIssuing(true);
       const file = values.image?.item(0);
       if (!file) throw new Error("Certificate image required");
+
+      /* 1. upload IPFS */
       const imageCid = await uploadFile(file);
-      const metadata = {
+      const metadata: CertificateMetadata = {
         name: values.name,
         institution: values.institution,
         program: values.program,
@@ -179,62 +211,54 @@ export const IssuerDashboard = () => {
       };
       const metadataCid = await uploadJson(metadata);
       const metadataCommitment = keccak256(toBytes(JSON.stringify(metadata)));
-      await walletClient.writeContract({
+
+      /* 2. generate ZK proof (optional) */
+      const proof = await handleGenerateProof(metadata);
+      if (!proof) console.warn("ZK proof skipped / failed");
+
+      console.log("Generated ZK Proof:", proof);
+
+      /* 3. issue certificate */
+      const hash = await walletClient.writeContract({
         address: CERTIFY_CONTRACT_ADDRESS,
         abi: CERTIFY_ABI,
         functionName: "issueCertificate",
         args: [values.holder as `0x${string}`, metadataCid, metadataCommitment],
         account,
       });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const id = (receipt as any).logs
+        .map((l: any) => {
+          try {
+            return parseAbiItem(
+              "event CertificateIssued(uint256,address,address)"
+            );
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean)[0]?.args?.certificateId;
+
       issueForm.reset();
       refetch();
-      alert("Certificate issued successfully!");
-    } catch (error) {
-      console.error("Issue certificate failed:", error);
-      alert("Failed to issue certificate. Please try again.");
+      alert(`Certificate issued! ID: ${id}`);
+    } catch (error: any) {
+      console.error(error);
+      alert(`Issue failed: ${error.message}`);
     } finally {
       setIsIssuing(false);
     }
   });
 
-  const removeFromPending = (holder: string) => {
-    setRequests((prev) =>
-      prev.filter((h) => h.toLowerCase() !== holder.toLowerCase())
-    );
-  };
+  /* ---------- mount ---------- */
+  useEffect(() => {
+    const key = localStorage.getItem("privateKey");
+    if (key) setPrivateKeyInput(key);
+    fetchRequestsAndMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
 
-  const onApprove = async (holder: string, approve: boolean) => {
-    if (!account) return alert("Set private key first");
-    try {
-      setProcessingHolder(holder);
-
-      const hash = await walletClient.writeContract({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "manageMember",
-        args: [holder as `0x${string}`, approve],
-        account,
-      });
-
-      console.log("Transaction hash:", hash);
-
-      // Tunggu konfirmasi
-      await publicClient.waitForTransactionReceipt({ hash });
-
-      console.log("Transaction confirmed, refreshing data...");
-
-      // Refresh data dari blockchain (PENTING!)
-      await fetchRequestsAndMembers();
-
-      alert(approve ? "Member approved!" : "Member rejected!");
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Failed to process decision");
-    } finally {
-      setProcessingHolder(null);
-    }
-  };
-
+  /* ---------- render ---------- */
   return (
     <section className="space-y-6">
       <header>
@@ -244,6 +268,7 @@ export const IssuerDashboard = () => {
         </p>
       </header>
 
+      {/* Private Key setter */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-3">
         <h3 className="font-semibold">Set Private Key</h3>
         <input
@@ -257,6 +282,7 @@ export const IssuerDashboard = () => {
         )}
       </div>
 
+      {/* Create Certificate form */}
       <div className="">
         <form
           onSubmit={onIssue}
@@ -309,12 +335,24 @@ export const IssuerDashboard = () => {
             disabled={isIssuing}
             {...issueForm.register("image", { required: true })}
           />
+
+          {/* ZK status */}
+          {zkLoading && (
+            <p className="text-xs text-yellow-400">⏳ Generating ZK proof...</p>
+          )}
+          {zkError && (
+            <p className="text-xs text-red-400">❌ ZK error: {zkError}</p>
+          )}
+          {zkProof && (
+            <p className="text-xs text-green-400">✅ ZK proof ready</p>
+          )}
+
           <button className="btn-primary w-full" disabled={isIssuing}>
             {isIssuing ? (
               <span className="flex items-center justify-center gap-2">
                 <svg
                   className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg "
+                  xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -338,14 +376,10 @@ export const IssuerDashboard = () => {
               "Issue Certificate"
             )}
           </button>
-          {isIssuing && (
-            <p className="text-xs text-yellow-400 animate-pulse">
-              ⏳ Uploading to IPFS and issuing on blockchain...
-            </p>
-          )}
         </form>
       </div>
 
+      {/* Pending Requests & Approved Members (persis seperti sebelumnya) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Pending Requests</h3>
@@ -354,33 +388,7 @@ export const IssuerDashboard = () => {
             disabled={isLoadingMembers}
             className="text-xs uppercase tracking-wide text-primary hover:text-primary/80 disabled:opacity-50"
           >
-            {isLoadingMembers ? (
-              <span className="flex items-center gap-1">
-                <svg
-                  className="animate-spin h-3 w-3"
-                  xmlns="http://www.w3.org/2000/svg "
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Loading...
-              </span>
-            ) : (
-              "Refresh"
-            )}
+            {isLoadingMembers ? "Loading..." : "Refresh"}
           </button>
         </div>
         {requests.length === 0 && (
@@ -398,64 +406,14 @@ export const IssuerDashboard = () => {
                 disabled={processingHolder === holder}
                 className="btn-secondary disabled:opacity-50"
               >
-                {processingHolder === holder ? (
-                  <span className="flex items-center gap-1">
-                    <svg
-                      className="animate-spin h-3 w-3"
-                      xmlns="http://www.w3.org/2000/svg "
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  </span>
-                ) : (
-                  "Approve"
-                )}
+                {processingHolder === holder ? "..." : "Approve"}
               </button>
               <button
                 onClick={() => onApprove(holder, false)}
                 disabled={processingHolder === holder}
                 className="btn-danger disabled:opacity-50"
               >
-                {processingHolder === holder ? (
-                  <span className="flex items-center gap-1">
-                    <svg
-                      className="animate-spin h-3 w-3"
-                      xmlns="http://www.w3.org/2000/svg "
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  </span>
-                ) : (
-                  "Reject"
-                )}
+                {processingHolder === holder ? "..." : "Reject"}
               </button>
             </div>
           </div>
@@ -472,6 +430,7 @@ export const IssuerDashboard = () => {
         ))}
       </div>
 
+      {/* Certificates list + ZK verify button */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Certificates</h3>
@@ -484,7 +443,20 @@ export const IssuerDashboard = () => {
         </div>
         <div className="grid gap-4">
           {certificates?.map((c) => (
-            <CertificateCard key={c.id.toString()} certificate={c} />
+            <div
+              key={c.id.toString()}
+              className="rounded-lg border border-slate-800 p-4"
+            >
+              <CertificateCard certificate={c} />
+              {zkProof && (
+                <button
+                  onClick={() => handleVerifyOnChain(c.id)}
+                  className="btn-secondary mt-2"
+                >
+                  Verify ZK on-chain
+                </button>
+              )}
+            </div>
           )) || <p className="text-sm text-slate-400">No certificates yet.</p>}
         </div>
       </div>

@@ -305,8 +305,6 @@ export const HolderDashboard = () => {
 
       {/* Certificates List */}
       <div className="space-y-3">
-        <h3 className="font-semibold">Certificates</h3>
-
         {/* status keanggotaan */}
         {!isChecking && memberships.length > 0 && (
           <div className="rounded-lg border border-green-700 bg-green-900/30 p-3">
@@ -318,6 +316,8 @@ export const HolderDashboard = () => {
             </ul>
           </div>
         )}
+        
+        <h3 className="font-semibold">Certificates</h3>
 
         {/* daftar sertifikat (tetap seperti semula) */}
         <div className="grid gap-4">

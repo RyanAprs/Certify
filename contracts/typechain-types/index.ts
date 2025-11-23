@@ -22,3 +22,7 @@ export type { IZKVerifier } from "./contracts/CertifyRegistry.sol/IZKVerifier";
 export { IZKVerifier__factory } from "./factories/contracts/CertifyRegistry.sol/IZKVerifier__factory";
 export type { ZKMockVerifier } from "./contracts/ZKMockVerifier";
 export { ZKMockVerifier__factory } from "./factories/contracts/ZKMockVerifier__factory";
+export type { IVerifier } from "./contracts/ZKPCertify.sol/IVerifier";
+export { IVerifier__factory } from "./factories/contracts/ZKPCertify.sol/IVerifier__factory";
+export type { ZKPCertify } from "./contracts/ZKPCertify.sol/ZKPCertify";
+export { ZKPCertify__factory } from "./factories/contracts/ZKPCertify.sol/ZKPCertify__factory";

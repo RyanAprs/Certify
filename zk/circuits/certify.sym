@@ -1,3 +1,4 @@
 1,2,0,main.secret
-2,3,0,main.data
-3,1,0,main.hash
+2,3,0,main.metadataHash
+3,4,0,main.minGpa
+4,1,0,main.hash

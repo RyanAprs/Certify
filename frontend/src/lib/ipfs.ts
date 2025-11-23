@@ -1,30 +1,54 @@
-import { create } from "ipfs-http-client";
-import { Buffer } from "buffer";
+import { PinataSDK } from "pinata";
 
-const projectId = import.meta.env.VITE_IPFS_PROJECT_ID;
-const projectSecret = import.meta.env.VITE_IPFS_PROJECT_SECRET;
-const auth = projectId && projectSecret ? `Basic ${btoa(`${projectId}:${projectSecret}`)}` : undefined;
-
-export const ipfsClient = create({
-  url: "https://ipfs.infura.io:5001/api/v0",
-  headers: auth ? { Authorization: auth } : undefined
+const pinata = new PinataSDK({
+  pinataJwt: import.meta.env.VITE_PINATA_JWT || "",
+  pinataGateway: import.meta.env.VITE_GATEWAY_URL || "",
 });
 
-export async function uploadJson<T>(payload: T) {
-  const result = await ipfsClient.add(JSON.stringify(payload));
-  return result.cid.toString();
-}
-
-export async function fetchJson<T>(cid: string): Promise<T> {
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of ipfsClient.cat(cid)) {
-    chunks.push(chunk as Uint8Array);
+/* ---------------- file ---------------- */
+export const uploadFile = async (file: File): Promise<string> => {
+  try {
+    const res = await pinata.upload.public.file(file);
+    return res.cid;
+  } catch (err) {
+    console.error("IPFS file upload failed:", err);
+    throw err;
   }
-  const data = new TextDecoder().decode(Buffer.concat(chunks));
-  return JSON.parse(data) as T;
+};
+
+/* ---------------- json ---------------- */
+export async function uploadJson<T>(payload: T): Promise<string> {
+  try {
+    const blob = new Blob([JSON.stringify(payload)], {
+      type: "application/json",
+    });
+
+    // blob → file (nama & lastModified dummy)
+    const file = new File([blob], "metadata.json", {
+      type: "application/json",
+      lastModified: Date.now(),
+    });
+
+    const res = await pinata.upload.public.file(file);
+    return res.cid;
+  } catch (err) {
+    console.error("IPFS JSON upload failed:", err);
+    throw err;
+  }
 }
 
-export async function uploadFile(file: File | Blob) {
-  const result = await ipfsClient.add(file);
-  return result.cid.toString();
+/* ---------------- fetch json ---------------- */
+export async function fetchJson<T>(cid: string): Promise<T> {
+  try {
+    const url = `https://${import.meta.env.VITE_GATEWAY_URL || ""}/ipfs/${cid}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch JSON from IPFS: ${res.statusText}`);
+    }
+    const data: T = await res.json();
+    return data;
+  } catch (err) {
+    console.error("IPFS JSON fetch failed:", err);
+    throw err;
+  }
 }

@@ -1,13 +1,16 @@
 template Certify() {
-    // Input signals (private)
+    // Private
     signal input secret;
-    signal input data;
-    
-    // Output signal (public)
+    signal input metadataHash;
+
+    // Public
+    signal input minGpa;
+
+    // Output publik
     signal output hash;
-    
-    // Constraint
-    hash <== secret * data;
+
+    // Constraint sederhana
+    hash <== secret * metadataHash;
 }
 
 component main = Certify();

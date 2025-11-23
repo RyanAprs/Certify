@@ -45,6 +45,14 @@ declare module "hardhat/types/runtime" {
       name: "ZKMockVerifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ZKMockVerifier__factory>;
+    getContractFactory(
+      name: "IVerifier",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.IVerifier__factory>;
+    getContractFactory(
+      name: "ZKPCertify",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.ZKPCertify__factory>;
 
     getContractAt(
       name: "AccessControl",
@@ -86,6 +94,16 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.ZKMockVerifier>;
+    getContractAt(
+      name: "IVerifier",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IVerifier>;
+    getContractAt(
+      name: "ZKPCertify",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.ZKPCertify>;
 
     deployContract(
       name: "AccessControl",
@@ -119,6 +137,14 @@ declare module "hardhat/types/runtime" {
       name: "ZKMockVerifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ZKMockVerifier>;
+    deployContract(
+      name: "IVerifier",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.IVerifier>;
+    deployContract(
+      name: "ZKPCertify",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.ZKPCertify>;
 
     deployContract(
       name: "AccessControl",
@@ -160,6 +186,16 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ZKMockVerifier>;
+    deployContract(
+      name: "IVerifier",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.IVerifier>;
+    deployContract(
+      name: "ZKPCertify",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.ZKPCertify>;
 
     // default types
     getContractFactory(
