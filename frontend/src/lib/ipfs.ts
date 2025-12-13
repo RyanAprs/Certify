@@ -52,3 +52,8 @@ export async function fetchJson<T>(cid: string): Promise<T> {
     throw err;
   }
 }
+
+/* ---------------- fetch from IPFS (alias) ---------------- */
+export async function fetchFromIpfs<T = any>(cid: string): Promise<T> {
+  return fetchJson<T>(cid);
+}

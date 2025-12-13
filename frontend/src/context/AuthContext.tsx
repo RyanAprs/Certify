@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [sessionAddress, setSessionAddress] = useState<`0x${string}` | null>(
     null
   );
-  const [loading, setLoading] = useState(true); // Ubah default ke true
+  const [loading, setLoading] = useState(true);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   const fetchSession = async () => {

@@ -4,7 +4,7 @@ async function main() {
   const [deployer] = await ethers.getSigners();
 
   // Deploy Verifier
-  const Verifier = await ethers.getContractFactory("ZKMockVerifier");
+  const Verifier = await ethers.getContractFactory("ZKPCertify");
   const verifier = await Verifier.deploy(deployer.address);
   await verifier.deployed();
   console.log("Verifier Address:", verifier.address);

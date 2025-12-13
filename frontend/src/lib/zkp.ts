@@ -1,5 +1,5 @@
 import { groth16 } from "snarkjs";
-import { keccak256, toBytes } from "viem";
+import { keccak256, toBytes, encodeAbiParameters } from "viem";
 
 export interface CertificateMetadata {
   name: string;
@@ -12,9 +12,9 @@ export interface CertificateMetadata {
 }
 
 export interface ProofInputs {
+  secret: string;
   metadataHash: string;
   minGpa: string;
-  actualGpa: string;
 }
 
 export interface ZKProof {
@@ -46,16 +46,32 @@ export function gpaToCircuitInput(gpa: string): string {
 }
 
 /**
- * Convert metadata hash to circuit input (remove 0x prefix and convert to decimal)
+ * Convert hash to circuit input (remove 0x prefix and convert to decimal)
  */
 export function hashToCircuitInput(hash: `0x${string}`): string {
-  // Remove 0x prefix and convert hex to decimal string
   const hexValue = hash.slice(2);
   return BigInt("0x" + hexValue).toString();
 }
 
 /**
- * Generate ZK proof for GPA verification
+ * Generate a random secret for the proof
+ */
+export function generateSecret(): string {
+  // Generate a random number as secret
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
+  const secret = BigInt(
+    "0x" +
+      Array.from(randomBytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
+  );
+  // Keep it reasonable size for circuit
+  return (secret % BigInt(1000000000)).toString();
+}
+
+/**
+ * Generate ZK proof for certificate verification
  * Uses files from public/zk/ directory
  */
 export async function generateGpaProof(
@@ -64,24 +80,22 @@ export async function generateGpaProof(
 ): Promise<ZKProof> {
   try {
     const metadataHash = generateMetadataCommitment(metadata);
-    const actualGpa = gpaToCircuitInput(metadata.gpa);
-    const minGpaCircuit = gpaToCircuitInput(minGpa);
     const metadataHashCircuit = hashToCircuitInput(metadataHash);
+    const minGpaCircuit = gpaToCircuitInput(minGpa);
+    const secret = generateSecret();
 
-    // Prepare circuit inputs
+    // Prepare circuit inputs matching your Certify circuit
     const input: ProofInputs = {
+      secret: secret,
       metadataHash: metadataHashCircuit,
       minGpa: minGpaCircuit,
-      actualGpa: actualGpa,
     };
 
     console.log("Generating proof with inputs:", {
+      secret: secret,
       metadataHash: metadataHash,
-      metadataHashCircuit: metadataHashCircuit,
-      minGpa: minGpa,
-      minGpaCircuit: minGpaCircuit,
-      actualGpa: metadata.gpa,
-      actualGpaCircuit: actualGpa,
+      metadataHashCircuit: metadataHashCircuit.slice(0, 20) + "...",
+      minGpa: `${minGpa} => ${minGpaCircuit}`,
     });
 
     // Generate proof using files from public/zk/
@@ -97,9 +111,9 @@ export async function generateGpaProof(
     return {
       proof: {
         pi_a: proof.pi_a.slice(0, 2).map((x: any) => x.toString()),
-        pi_b: proof.pi_b.map((row: any[]) =>
-          row.slice(0, 2).map((x: any) => x.toString())
-        ),
+        pi_b: proof.pi_b
+          .slice(0, 2)
+          .map((row: any[]) => row.slice(0, 2).map((x: any) => x.toString())),
         pi_c: proof.pi_c.slice(0, 2).map((x: any) => x.toString()),
       },
       publicSignals: publicSignals.map((x: any) => x.toString()),
@@ -144,14 +158,56 @@ export async function verifyProof(zkProof: ZKProof): Promise<boolean> {
 
 /**
  * Format proof for Solidity verifier contract
+ * This matches the standard Groth16 verifier format
  */
 export function formatProofForSolidity(zkProof: ZKProof) {
+  const pA = zkProof.proof.pi_a.slice(0, 2); // [2]
+  const pB = zkProof.proof.pi_b.slice(0, 2).map((row) => row.slice(0, 2)); // [2][2]
+  const pC = zkProof.proof.pi_c.slice(0, 2); // [2]
+  const pubSignals = zkProof.publicSignals;
+
   return {
-    pA: zkProof.proof.pi_a,
-    pB: zkProof.proof.pi_b,
-    pC: zkProof.proof.pi_c,
-    pubSignals: zkProof.publicSignals,
+    pA,
+    pB,
+    pC,
+    pubSignals,
   };
+}
+
+/**
+ * Encode proof as bytes for contract call
+ * Format depends on your ZKVerifier contract implementation
+ *
+ * Option 1: Standard Groth16 format (a, b, c, input)
+ * Option 2: Packed format with all components
+ */
+export function encodeProofForContract(
+  zkProof: ZKProof,
+  format: "standard" | "packed" = "standard"
+): `0x${string}` {
+  const { pA, pB, pC, pubSignals } = formatProofForSolidity(zkProof);
+
+  if (format === "standard") {
+    // Standard encoding: (uint[2] a, uint[2][2] b, uint[2] c, uint[] input)
+    return encodeAbiParameters(
+      [
+        { type: "uint256[2]", name: "a" },
+        { type: "uint256[2][2]", name: "b" },
+        { type: "uint256[2]", name: "c" },
+        { type: "uint256[]", name: "input" },
+      ],
+      [pA, pB, pC, pubSignals]
+    ) as `0x${string}`;
+  } else {
+    // Packed encoding: all values concatenated
+    // Format: a[0], a[1], b[0][0], b[0][1], b[1][0], b[1][1], c[0], c[1], input[0], input[1], ...
+    const allValues = [...pA, ...pB[0], ...pB[1], ...pC, ...pubSignals];
+
+    return encodeAbiParameters(
+      [{ type: "uint256[]" }],
+      [allValues]
+    ) as `0x${string}`;
+  }
 }
 
 /**

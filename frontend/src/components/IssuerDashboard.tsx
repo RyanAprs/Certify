@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { useIssuerCertificates } from "../hooks/useCertificates";
 import { CertificateCard } from "./Shared";
 import { uploadFile, uploadJson } from "../lib/ipfs";
-import { keccak256, parseAbiItem, toBytes } from "viem";
+import { keccak256, parseAbiItem, toBytes, decodeEventLog } from "viem";
 import { useLocalAccount } from "../hooks/useLocalAccount";
 import {
   walletClient,
@@ -167,27 +167,6 @@ export const IssuerDashboard = () => {
     }
   };
 
-  const handleVerifyOnChain = async (certificateId: bigint) => {
-    if (!zkProof || !account) return alert("No proof / account");
-    try {
-      const { pA, pB, pC, pubSignals } = formatProofForSolidity(zkProof);
-
-      // pilih fungsi sesuai kontrak
-      const hash = await walletClient.writeContract({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "verifySelectiveProof", // atau "verifyGpaProof" kalau pakai ZKPCertify
-        args: [certificateId, pA, pB, pC, pubSignals],
-        account,
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-      alert("✅ ZK proof verified on-chain!");
-    } catch (e: any) {
-      console.error(e);
-      alert(`On-chain verification failed: ${e.message}`);
-    }
-  };
-
   /* ---------- issue certificate + ZK ---------- */
   const onIssue = issueForm.handleSubmit(async (values) => {
     if (!account) return alert("Set private key first");
@@ -226,22 +205,43 @@ export const IssuerDashboard = () => {
         args: [values.holder as `0x${string}`, metadataCid, metadataCommitment],
         account,
       });
+
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      const id = (receipt as any).logs
-        .map((l: any) => {
-          try {
-            return parseAbiItem(
-              "event CertificateIssued(uint256,address,address)"
-            );
-          } catch {
-            return null;
+
+      /* 4. Parse certificate ID from logs */
+      let certificateId: bigint | undefined;
+
+      // Try to find CertificateIssued event in logs
+      const certificateIssuedEvent = parseAbiItem(
+        "event CertificateIssued(uint256 indexed certificateId, address indexed issuer, address indexed holder)"
+      );
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: [certificateIssuedEvent],
+            data: log.data,
+            topics: log.topics,
+          });
+
+          if (decoded.eventName === "CertificateIssued") {
+            certificateId = decoded.args.certificateId as bigint;
+            break;
           }
-        })
-        .filter(Boolean)[0]?.args?.certificateId;
+        } catch (e) {
+          // Skip logs that don't match
+          continue;
+        }
+      }
 
       issueForm.reset();
       refetch();
-      alert(`Certificate issued! ID: ${id}`);
+
+      if (certificateId !== undefined) {
+        alert(`✅ Certificate issued! ID: ${certificateId.toString()}`);
+      } else {
+        alert("✅ Certificate issued successfully!");
+      }
     } catch (error: any) {
       console.error(error);
       alert(`Issue failed: ${error.message}`);
@@ -379,7 +379,7 @@ export const IssuerDashboard = () => {
         </form>
       </div>
 
-      {/* Pending Requests & Approved Members (persis seperti sebelumnya) */}
+      {/* Pending Requests & Approved Members */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Pending Requests</h3>
@@ -448,14 +448,6 @@ export const IssuerDashboard = () => {
               className="rounded-lg border border-slate-800 p-4"
             >
               <CertificateCard certificate={c} />
-              {zkProof && (
-                <button
-                  onClick={() => handleVerifyOnChain(c.id)}
-                  className="btn-secondary mt-2"
-                >
-                  Verify ZK on-chain
-                </button>
-              )}
             </div>
           )) || <p className="text-sm text-slate-400">No certificates yet.</p>}
         </div>
