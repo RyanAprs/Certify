@@ -22,10 +22,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IAccessControl__factory>;
     getContractFactory(
-      name: "ECDSA",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.ECDSA__factory>;
-    getContractFactory(
       name: "ERC165",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ERC165__factory>;
@@ -42,9 +38,9 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IZKVerifier__factory>;
     getContractFactory(
-      name: "ZKMockVerifier",
+      name: "Groth16Verifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.ZKMockVerifier__factory>;
+    ): Promise<Contracts.Groth16Verifier__factory>;
     getContractFactory(
       name: "IVerifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
@@ -65,11 +61,6 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.IAccessControl>;
     getContractAt(
-      name: "ECDSA",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.ECDSA>;
-    getContractAt(
       name: "ERC165",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
@@ -90,10 +81,10 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.IZKVerifier>;
     getContractAt(
-      name: "ZKMockVerifier",
+      name: "Groth16Verifier",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
-    ): Promise<Contracts.ZKMockVerifier>;
+    ): Promise<Contracts.Groth16Verifier>;
     getContractAt(
       name: "IVerifier",
       address: string | ethers.Addressable,
@@ -114,10 +105,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IAccessControl>;
     deployContract(
-      name: "ECDSA",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.ECDSA>;
-    deployContract(
       name: "ERC165",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ERC165>;
@@ -134,9 +121,9 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IZKVerifier>;
     deployContract(
-      name: "ZKMockVerifier",
+      name: "Groth16Verifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.ZKMockVerifier>;
+    ): Promise<Contracts.Groth16Verifier>;
     deployContract(
       name: "IVerifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
@@ -157,11 +144,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IAccessControl>;
     deployContract(
-      name: "ECDSA",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.ECDSA>;
-    deployContract(
       name: "ERC165",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
@@ -182,10 +164,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IZKVerifier>;
     deployContract(
-      name: "ZKMockVerifier",
+      name: "Groth16Verifier",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.ZKMockVerifier>;
+    ): Promise<Contracts.Groth16Verifier>;
     deployContract(
       name: "IVerifier",
       args: any[],

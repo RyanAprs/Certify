@@ -20,8 +20,11 @@ const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {},
+    localhost: {
+      url: "http://127.0.0.1:8545",
+    },
     sepolia: {
-      url: RPC_URL || undefined,
+      url: RPC_URL || "https://sepolia.infura.io/v3/",
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
   },

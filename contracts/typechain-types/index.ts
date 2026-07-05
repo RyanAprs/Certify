@@ -10,8 +10,6 @@ export type { AccessControl } from "./@openzeppelin/contracts/access/AccessContr
 export { AccessControl__factory } from "./factories/@openzeppelin/contracts/access/AccessControl__factory";
 export type { IAccessControl } from "./@openzeppelin/contracts/access/IAccessControl";
 export { IAccessControl__factory } from "./factories/@openzeppelin/contracts/access/IAccessControl__factory";
-export type { ECDSA } from "./@openzeppelin/contracts/utils/cryptography/ECDSA";
-export { ECDSA__factory } from "./factories/@openzeppelin/contracts/utils/cryptography/ECDSA__factory";
 export type { ERC165 } from "./@openzeppelin/contracts/utils/introspection/ERC165";
 export { ERC165__factory } from "./factories/@openzeppelin/contracts/utils/introspection/ERC165__factory";
 export type { IERC165 } from "./@openzeppelin/contracts/utils/introspection/IERC165";
@@ -20,8 +18,8 @@ export type { CertifyRegistry } from "./contracts/CertifyRegistry.sol/CertifyReg
 export { CertifyRegistry__factory } from "./factories/contracts/CertifyRegistry.sol/CertifyRegistry__factory";
 export type { IZKVerifier } from "./contracts/CertifyRegistry.sol/IZKVerifier";
 export { IZKVerifier__factory } from "./factories/contracts/CertifyRegistry.sol/IZKVerifier__factory";
-export type { ZKMockVerifier } from "./contracts/ZKMockVerifier";
-export { ZKMockVerifier__factory } from "./factories/contracts/ZKMockVerifier__factory";
+export type { Groth16Verifier } from "./contracts/verifier.sol/Groth16Verifier";
+export { Groth16Verifier__factory } from "./factories/contracts/verifier.sol/Groth16Verifier__factory";
 export type { IVerifier } from "./contracts/ZKPCertify.sol/IVerifier";
 export { IVerifier__factory } from "./factories/contracts/ZKPCertify.sol/IVerifier__factory";
 export type { ZKPCertify } from "./contracts/ZKPCertify.sol/ZKPCertify";

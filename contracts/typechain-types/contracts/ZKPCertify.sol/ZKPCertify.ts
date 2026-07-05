@@ -26,16 +26,19 @@ import type {
 export interface ZKPCertifyInterface extends Interface {
   getFunction(
     nameOrSignature:
+      | "admin"
       | "certificateCounter"
       | "certificates"
       | "getCertificate"
       | "isMember"
       | "issueCertificate"
+      | "issuerNonce"
       | "manageMember"
       | "memberRequests"
       | "members"
       | "requestMembership"
       | "revokeCertificate"
+      | "verifiedProofs"
       | "verifier"
       | "verifyGpaProof"
   ): FunctionFragment;
@@ -49,6 +52,7 @@ export interface ZKPCertifyInterface extends Interface {
       | "ProofVerified"
   ): EventFragment;
 
+  encodeFunctionData(functionFragment: "admin", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "certificateCounter",
     values?: undefined
@@ -67,7 +71,11 @@ export interface ZKPCertifyInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "issueCertificate",
-    values: [AddressLike, string, BytesLike]
+    values: [AddressLike, AddressLike, string, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "issuerNonce",
+    values: [AddressLike, AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "manageMember",
@@ -89,6 +97,10 @@ export interface ZKPCertifyInterface extends Interface {
     functionFragment: "revokeCertificate",
     values: [BigNumberish]
   ): string;
+  encodeFunctionData(
+    functionFragment: "verifiedProofs",
+    values: [BytesLike]
+  ): string;
   encodeFunctionData(functionFragment: "verifier", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "verifyGpaProof",
@@ -97,10 +109,11 @@ export interface ZKPCertifyInterface extends Interface {
       [BigNumberish, BigNumberish],
       [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       [BigNumberish, BigNumberish],
-      [BigNumberish, BigNumberish]
+      [BigNumberish, BigNumberish, BigNumberish]
     ]
   ): string;
 
+  decodeFunctionResult(functionFragment: "admin", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "certificateCounter",
     data: BytesLike
@@ -119,6 +132,10 @@ export interface ZKPCertifyInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "issuerNonce",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "manageMember",
     data: BytesLike
   ): Result;
@@ -133,6 +150,10 @@ export interface ZKPCertifyInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "revokeCertificate",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "verifiedProofs",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "verifier", data: BytesLike): Result;
@@ -278,18 +299,21 @@ export interface ZKPCertify extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
+  admin: TypedContractMethod<[], [string], "view">;
+
   certificateCounter: TypedContractMethod<[], [bigint], "view">;
 
   certificates: TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [string, string, string, string, bigint, boolean] & {
+      [string, string, string, string, bigint, boolean, bigint] & {
         issuer: string;
         holder: string;
         metadataCid: string;
         metadataCommitment: string;
         issuedAt: bigint;
         revoked: boolean;
+        nonce: bigint;
       }
     ],
     "view"
@@ -317,9 +341,20 @@ export interface ZKPCertify extends BaseContract {
   >;
 
   issueCertificate: TypedContractMethod<
-    [holder: AddressLike, metadataCid: string, metadataCommitment: BytesLike],
+    [
+      issuer: AddressLike,
+      holder: AddressLike,
+      metadataCid: string,
+      metadataCommitment: BytesLike
+    ],
     [void],
     "nonpayable"
+  >;
+
+  issuerNonce: TypedContractMethod<
+    [arg0: AddressLike, arg1: AddressLike],
+    [bigint],
+    "view"
   >;
 
   manageMember: TypedContractMethod<
@@ -358,6 +393,18 @@ export interface ZKPCertify extends BaseContract {
     "nonpayable"
   >;
 
+  verifiedProofs: TypedContractMethod<
+    [arg0: BytesLike],
+    [
+      [bigint, string, bigint] & {
+        certificateId: bigint;
+        proofHash: string;
+        verifiedAt: bigint;
+      }
+    ],
+    "view"
+  >;
+
   verifier: TypedContractMethod<[], [string], "view">;
 
   verifyGpaProof: TypedContractMethod<
@@ -366,7 +413,7 @@ export interface ZKPCertify extends BaseContract {
       pA: [BigNumberish, BigNumberish],
       pB: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       pC: [BigNumberish, BigNumberish],
-      pubSignals: [BigNumberish, BigNumberish]
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
     ],
     [boolean],
     "nonpayable"
@@ -377,6 +424,9 @@ export interface ZKPCertify extends BaseContract {
   ): T;
 
   getFunction(
+    nameOrSignature: "admin"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
     nameOrSignature: "certificateCounter"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -384,13 +434,14 @@ export interface ZKPCertify extends BaseContract {
   ): TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [string, string, string, string, bigint, boolean] & {
+      [string, string, string, string, bigint, boolean, bigint] & {
         issuer: string;
         holder: string;
         metadataCid: string;
         metadataCommitment: string;
         issuedAt: bigint;
         revoked: boolean;
+        nonce: bigint;
       }
     ],
     "view"
@@ -421,9 +472,21 @@ export interface ZKPCertify extends BaseContract {
   getFunction(
     nameOrSignature: "issueCertificate"
   ): TypedContractMethod<
-    [holder: AddressLike, metadataCid: string, metadataCommitment: BytesLike],
+    [
+      issuer: AddressLike,
+      holder: AddressLike,
+      metadataCid: string,
+      metadataCommitment: BytesLike
+    ],
     [void],
     "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "issuerNonce"
+  ): TypedContractMethod<
+    [arg0: AddressLike, arg1: AddressLike],
+    [bigint],
+    "view"
   >;
   getFunction(
     nameOrSignature: "manageMember"
@@ -459,6 +522,19 @@ export interface ZKPCertify extends BaseContract {
     nameOrSignature: "revokeCertificate"
   ): TypedContractMethod<[certificateId: BigNumberish], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "verifiedProofs"
+  ): TypedContractMethod<
+    [arg0: BytesLike],
+    [
+      [bigint, string, bigint] & {
+        certificateId: bigint;
+        proofHash: string;
+        verifiedAt: bigint;
+      }
+    ],
+    "view"
+  >;
+  getFunction(
     nameOrSignature: "verifier"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
@@ -469,7 +545,7 @@ export interface ZKPCertify extends BaseContract {
       pA: [BigNumberish, BigNumberish],
       pB: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       pC: [BigNumberish, BigNumberish],
-      pubSignals: [BigNumberish, BigNumberish]
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
     ],
     [boolean],
     "nonpayable"

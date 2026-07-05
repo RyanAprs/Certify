@@ -7,12 +7,11 @@ interface IVerifier {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint[2] calldata _pubSignals
+        uint[3] calldata _pubSignals
     ) external view returns (bool);
 }
 
 contract ZKPCertify {
-    // Existing structs and mappings
     struct Certificate {
         address issuer;
         address holder;
@@ -20,6 +19,7 @@ contract ZKPCertify {
         bytes32 metadataCommitment;
         uint256 issuedAt;
         bool revoked;
+        uint256 nonce;
     }
 
     struct MemberRequest {
@@ -28,14 +28,23 @@ contract ZKPCertify {
         bool decided;
     }
 
+    struct ProofVerification {
+        uint256 certificateId;
+        bytes32 proofHash;
+        uint256 verifiedAt;
+    }
+
     mapping(uint256 => Certificate) public certificates;
     mapping(address => mapping(address => MemberRequest)) public memberRequests;
     mapping(address => mapping(address => bool)) public members;
-    
+    mapping(address => mapping(address => uint256)) public issuerNonce;
+    mapping(bytes32 => ProofVerification) public verifiedProofs;
+
     uint256 public certificateCounter;
-    
-    // ZKP Verifier contract address
-    IVerifier public verifier;
+
+    // ZKP Verifier contract address (immutable)
+    IVerifier public immutable verifier;
+    address public immutable admin;
 
     // Events
     event CertificateIssued(
@@ -67,8 +76,16 @@ contract ZKPCertify {
         _;
     }
 
-    constructor(address _verifier) {
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "not admin");
+        _;
+    }
+
+    constructor(address _verifier, address _admin) {
+        require(_verifier != address(0), "invalid verifier");
+        require(_admin != address(0), "invalid admin");
         verifier = IVerifier(_verifier);
+        admin = _admin;
     }
 
     // Existing functions
@@ -97,25 +114,29 @@ contract ZKPCertify {
     }
 
     function issueCertificate(
+        address issuer,
         address holder,
         string memory metadataCid,
         bytes32 metadataCommitment
-    ) external {
-        require(members[msg.sender][holder], "holder not member");
-        
+    ) external onlyIssuer(issuer) {
+        require(members[issuer][holder], "holder not member");
+
         certificateCounter++;
+        issuerNonce[issuer][holder]++;
+
         certificates[certificateCounter] = Certificate({
-            issuer: msg.sender,
+            issuer: issuer,
             holder: holder,
             metadataCid: metadataCid,
             metadataCommitment: metadataCommitment,
             issuedAt: block.timestamp,
-            revoked: false
+            revoked: false,
+            nonce: issuerNonce[issuer][holder]
         });
 
         emit CertificateIssued(
             certificateCounter,
-            msg.sender,
+            issuer,
             holder,
             metadataCid,
             metadataCommitment
@@ -131,39 +152,41 @@ contract ZKPCertify {
         emit CertificateRevoked(certificateId);
     }
 
-    // NEW: ZKP Verification Functions
-    
-        /**
-     * @notice Verify a zero-knowledge proof for certificate GPA
-     * @param certificateId The ID of the certificate
-     * @param pA Proof component A (G1)
-     * @param pB Proof component B (G2)
-     * @param pC Proof component C (G1)
-     * @param pubSignals Public signals [metadataCommitment, minGpa]
-     * @return bool Whether the proof is valid
-     */
     function verifyGpaProof(
         uint256 certificateId,
         uint[2] calldata pA,
         uint[2][2] calldata pB,
         uint[2] calldata pC,
-        uint[2] calldata pubSignals
+        uint[3] calldata pubSignals
     ) external returns (bool) {
         Certificate storage cert = certificates[certificateId];
         require(!cert.revoked, "certificate revoked");
-        
-        // Verify that the first public signal matches the certificate's metadata commitment
+        require(cert.holder == msg.sender, "not certificate holder");
+
+        bytes32 proofHash = keccak256(abi.encodePacked(pA, pB, pC, pubSignals));
+        require(verifiedProofs[proofHash].certificateId == 0, "proof already used");
+
         require(
-            bytes32(pubSignals[0]) == cert.metadataCommitment,
+            bytes32(uint256(pubSignals[0])) == cert.metadataCommitment,
             "metadata commitment mismatch"
         );
 
-        // Verify the ZK proof using the verifier contract
+        require(
+            uint256(pubSignals[2]) == cert.nonce,
+            "proof nonce mismatch"
+        );
+
         bool verified = verifier.verifyProof(pA, pB, pC, pubSignals);
-        
-        emit ProofVerified(certificateId, msg.sender, verified);
-        
-        return verified;
+        require(verified, "invalid proof");
+
+        verifiedProofs[proofHash] = ProofVerification({
+            certificateId: certificateId,
+            proofHash: proofHash,
+            verifiedAt: block.timestamp
+        });
+
+        emit ProofVerified(certificateId, msg.sender, true);
+        return true;
     }
 
     /**

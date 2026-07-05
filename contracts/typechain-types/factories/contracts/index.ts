@@ -3,4 +3,4 @@
 /* eslint-disable */
 export * as certifyRegistrySol from "./CertifyRegistry.sol";
 export * as zkpCertifySol from "./ZKPCertify.sol";
-export { ZKMockVerifier__factory } from "./ZKMockVerifier__factory";
+export * as verifierSol from "./verifier.sol";

@@ -14,7 +14,9 @@ export interface CertificateMetadata {
 export interface ProofInputs {
   secret: string;
   metadataHash: string;
+  actualGpa: string;
   minGpa: string;
+  nonce: string;
 }
 
 export interface ZKProof {
@@ -27,22 +29,35 @@ export interface ZKProof {
 }
 
 /**
- * Generate metadata commitment (hash)
+ * Generate deterministic metadata commitment (hash)
+ * Uses canonical JSON ordering to ensure reproducible hashes
  */
 export function generateMetadataCommitment(
   metadata: CertificateMetadata
 ): `0x${string}` {
-  return keccak256(toBytes(JSON.stringify(metadata)));
+  const canonical = JSON.stringify({
+    description: metadata.description,
+    gpa: metadata.gpa,
+    imageCid: metadata.imageCid,
+    institution: metadata.institution,
+    issuedAt: metadata.issuedAt,
+    name: metadata.name,
+    program: metadata.program,
+  });
+  return keccak256(toBytes(canonical));
 }
 
 /**
- * Convert GPA string to circuit input (multiply by 100)
- * Example: "3.75" => "375"
+ * Convert GPA string to circuit input (multiply by 100, no rounding)
+ * Example: "3.75" => "375", "4.0" => "400"
+ * Uses floor to avoid rounding errors
  */
 export function gpaToCircuitInput(gpa: string): string {
   const gpaFloat = parseFloat(gpa);
-  if (isNaN(gpaFloat)) throw new Error("Invalid GPA format");
-  return Math.round(gpaFloat * 100).toString();
+  if (isNaN(gpaFloat) || gpaFloat < 0 || gpaFloat > 5) {
+    throw new Error("Invalid GPA format: must be 0-5");
+  }
+  return Math.floor(gpaFloat * 100).toString();
 }
 
 /**
@@ -54,59 +69,59 @@ export function hashToCircuitInput(hash: `0x${string}`): string {
 }
 
 /**
- * Generate a random secret for the proof
+ * Generate a cryptographically secure random secret (256-bit)
  */
 export function generateSecret(): string {
-  // Generate a random number as secret
   const randomBytes = new Uint8Array(32);
   crypto.getRandomValues(randomBytes);
-  const secret = BigInt(
+  return (
     "0x" +
-      Array.from(randomBytes)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("")
+    Array.from(randomBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
   );
-  // Keep it reasonable size for circuit
-  return (secret % BigInt(1000000000)).toString();
 }
 
 /**
- * Generate ZK proof for certificate verification
- * Uses files from public/zk/ directory
+ * Generate ZK proof for GPA verification
+ * Proves: actualGpa >= minGpa with commitment to metadata
  */
 export async function generateGpaProof(
   metadata: CertificateMetadata,
-  minGpa: string
+  minGpa: string,
+  nonce: string
 ): Promise<ZKProof> {
   try {
     const metadataHash = generateMetadataCommitment(metadata);
     const metadataHashCircuit = hashToCircuitInput(metadataHash);
+    const actualGpa = metadata.gpa;
+    const actualGpaCircuit = gpaToCircuitInput(actualGpa);
     const minGpaCircuit = gpaToCircuitInput(minGpa);
     const secret = generateSecret();
 
-    // Prepare circuit inputs matching your Certify circuit
     const input: ProofInputs = {
       secret: secret,
       metadataHash: metadataHashCircuit,
+      actualGpa: actualGpaCircuit,
       minGpa: minGpaCircuit,
+      nonce: nonce,
     };
 
-    console.log("Generating proof with inputs:", {
-      secret: secret,
-      metadataHash: metadataHash,
-      metadataHashCircuit: metadataHashCircuit.slice(0, 20) + "...",
+    console.log("Generating GPA proof with inputs:", {
+      secret,
+      metadata: metadata.name,
+      actualGpa: `${actualGpa} => ${actualGpaCircuit}`,
       minGpa: `${minGpa} => ${minGpaCircuit}`,
+      nonce,
     });
 
-    // Generate proof using files from public/zk/
     const { proof, publicSignals } = await groth16.fullProve(
       input,
       "/zk/certify.wasm",
       "/zk/certify.zkey"
     );
 
-    console.log("Proof generated successfully");
-    console.log("Public signals:", publicSignals);
+    console.log("Proof generated. Public signals:", publicSignals);
 
     return {
       proof: {
