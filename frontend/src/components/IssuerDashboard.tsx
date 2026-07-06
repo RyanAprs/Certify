@@ -40,6 +40,7 @@ export const IssuerDashboard = () => {
   const [privateKeyInput, setPrivateKeyInput] = useState("");
   const [requests, setRequests] = useState<string[]>([]);
   const [members, setMembers] = useState<string[]>([]);
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [processingHolder, setProcessingHolder] = useState<string | null>(null);
@@ -72,16 +73,16 @@ export const IssuerDashboard = () => {
         event: parseAbiItem(
           "event MemberRequested(address indexed issuer, address indexed holder)"
         ),
-        fromBlock: current - 100n < 0n ? 0n : current - 100n,
+        fromBlock: 0n,
         toBlock: "latest",
       });
 
       const forMe = logs.filter(
-        (l) => l.args.issuer.toLowerCase() === address.toLowerCase()
+        (l) => l.args.issuer?.toLowerCase() === address.toLowerCase()
       );
 
       const holders = [
-        ...new Set(forMe.map((l) => l.args.holder.toLowerCase())),
+        ...new Set(forMe.map((l) => l.args.holder?.toLowerCase()).filter(Boolean) as string[]),
       ];
 
       const results = await Promise.all(
@@ -94,14 +95,8 @@ export const IssuerDashboard = () => {
               args: [address, holder as `0x${string}`],
             });
 
-            let applicant, approved, decided;
-            if (Array.isArray(req)) {
-              [applicant, approved, decided] = req;
-            } else if (typeof req === "object" && req !== null) {
-              applicant = req.applicant;
-              approved = req.approved;
-              decided = req.decided;
-            } else return null;
+            // readContract returns tuple: [applicant, approved, decided]
+            const [, approved, decided] = req as unknown as [string, boolean, boolean];
 
             return {
               holder,
@@ -116,9 +111,44 @@ export const IssuerDashboard = () => {
 
       const valid = results.filter((r) => r !== null);
       setRequests(valid.filter((r) => !r.decided).map((r) => r.holder));
-      setMembers(
-        valid.filter((r) => r.decided && r.approved).map((r) => r.holder)
+      const approvedMembers = valid
+        .filter((r) => r.decided && r.approved)
+        .map((r) => r.holder);
+      setMembers(approvedMembers);
+
+      // Ambil nama holder dari sertifikat yang sudah pernah diterbitkan
+      const names: Record<string, string> = {};
+      await Promise.all(
+        approvedMembers.map(async (holder) => {
+          try {
+            const certIds = await publicClient.readContract({
+              address: CERTIFY_CONTRACT_ADDRESS,
+              abi: CERTIFY_ABI,
+              functionName: "getHolderCertificates",
+              args: [holder as `0x${string}`],
+            }) as bigint[];
+            // Cari sertifikat yang diterbitkan oleh issuer ini
+            for (const certId of certIds) {
+              const cert = await publicClient.readContract({
+                address: CERTIFY_CONTRACT_ADDRESS,
+                abi: CERTIFY_ABI,
+                functionName: "certificates",
+                args: [certId],
+              }) as unknown as [bigint, string, string, string, string, number, bigint];
+              // tuple: [id, issuer, holder, metadataCid, metadataCommitment, status, issuedAt]
+              const [, certIssuer, , certMetadataCid] = cert;
+              if (certIssuer.toLowerCase() === address.toLowerCase() && certMetadataCid) {
+                try {
+                  const res = await fetch(`https://gateway.pinata.cloud/ipfs/${certMetadataCid}`);
+                  const meta = await res.json();
+                  if (meta.name) { names[holder] = meta.name; break; }
+                } catch { /* skip jika IPFS gagal */ }
+              }
+            }
+          } catch { /* skip jika gagal */ }
+        })
       );
+      setMemberNames(names);
     } catch (err) {
       console.error(err);
       alert("Gagal load member");
@@ -174,6 +204,24 @@ export const IssuerDashboard = () => {
     setZkProof(null);
     setZkError(null);
     try {
+      // Pre-check: pastikan holder sudah approved sebelum waste gas
+      const memberRequestRaw = await publicClient.readContract({
+        address: CERTIFY_CONTRACT_ADDRESS,
+        abi: CERTIFY_ABI,
+        functionName: "memberRequests",
+        args: [account.address, values.holder as `0x${string}`],
+      }) as unknown as [string, boolean, boolean];
+
+      // memberRequests returns tuple: [applicant, approved, decided]
+      const [, mrApproved, mrDecided] = memberRequestRaw;
+
+      if (!mrDecided || !mrApproved) {
+        const reason = !mrDecided
+          ? "Holder belum pernah mengajukan request, atau request belum diputuskan."
+          : "Request holder telah ditolak.";
+        throw new Error(`Holder belum disetujui sebagai member. ${reason} Approve request terlebih dahulu.`);
+      }
+
       const file = values.image?.item(0);
       if (!file) throw new Error("Certificate image required");
 
@@ -289,12 +337,27 @@ export const IssuerDashboard = () => {
           className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4"
         >
           <h3 className="font-semibold">Create Certificate</h3>
-          <input
-            className="input"
-            placeholder="Holder Address"
-            disabled={isIssuing}
-            {...issueForm.register("holder", { required: true })}
-          />
+          <div className="space-y-1">
+            <label className="text-sm text-slate-400">Holder</label>
+            {members.length === 0 ? (
+              <p className="text-sm text-yellow-400 rounded-lg border border-yellow-800 bg-yellow-900/20 px-3 py-2">
+                ⚠️ Belum ada member yang disetujui. Approve request holder terlebih dahulu.
+              </p>
+            ) : (
+              <select
+                className="input"
+                disabled={isIssuing}
+                {...issueForm.register("holder", { required: true })}
+              >
+                <option value="">-- Pilih Holder --</option>
+                {members.map((addr) => (
+                  <option key={addr} value={addr}>
+                    {memberNames[addr] ? `${memberNames[addr]} — ${addr}` : addr}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <input
             className="input"
             placeholder="Nama"

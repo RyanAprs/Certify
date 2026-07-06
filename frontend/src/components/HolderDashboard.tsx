@@ -47,7 +47,7 @@ export const HolderDashboard = () => {
         event: parseAbiItem(
           "event MemberDecision(address indexed issuer, address indexed holder, bool approved)"
         ),
-        fromBlock: current - 100n < 0n ? 0n : current - 100n,
+        fromBlock: 0n,
         toBlock: "latest",
       });
 
@@ -55,10 +55,11 @@ export const HolderDashboard = () => {
       const approved = logs
         .filter(
           (l) =>
-            l.args.holder.toLowerCase() === address.toLowerCase() &&
+            l.args.holder?.toLowerCase() === address.toLowerCase() &&
             l.args.approved
         )
-        .map((l) => l.args.issuer);
+        .map((l) => l.args.issuer)
+        .filter((issuer): issuer is `0x${string}` => !!issuer);
 
       // hilangkan duplikat
       setMemberships([...new Set(approved)]);
@@ -96,6 +97,20 @@ export const HolderDashboard = () => {
     if (!account) return alert("Set private key first");
     try {
       setIsRequestingMembership(true);
+
+      // Pre-check: pastikan target address adalah registered issuer
+      const isRegistered = await publicClient.readContract({
+        address: CERTIFY_CONTRACT_ADDRESS,
+        abi: CERTIFY_ABI,
+        functionName: "registeredIssuers",
+        args: [values.issuer as `0x${string}`],
+      });
+
+      if (!isRegistered) {
+        alert(`❌ Address ${values.issuer} bukan Issuer yang terdaftar di sistem. Pastikan address yang Anda masukkan sudah benar.`);
+        return;
+      }
+
       await writeContractFresh({
         address: CERTIFY_CONTRACT_ADDRESS,
         abi: CERTIFY_ABI,
@@ -104,10 +119,10 @@ export const HolderDashboard = () => {
         account,
       });
       membershipForm.reset();
-      alert("Membership request sent successfully!");
-    } catch (error) {
+      alert("✅ Membership request berhasil dikirim!");
+    } catch (error: any) {
       console.error("Membership request failed:", error);
-      alert("Failed to send membership request. Please try again.");
+      alert(`❌ Gagal mengirim request: ${error.message}`);
     } finally {
       setIsRequestingMembership(false);
     }

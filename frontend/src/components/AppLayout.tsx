@@ -1,17 +1,19 @@
 import { Link, NavLink } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAuth } from "../context/AuthContext";
+import { useRole } from "../context/RoleContext";
 import { useState } from "react";
-
-const links = [
-  { to: "/issuer", label: "Issuer" },
-  { to: "/holder", label: "Holder" },
-  { to: "/verifier", label: "Verifier" },
-];
 
 export const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const { address, logout } = useAuth();
+  const { isIssuer, roleLoading } = useRole();
   const [copied, setCopied] = useState(false);
+
+  const links = [
+    ...(isIssuer ? [{ to: "/issuer", label: "Issuer" }] : []),
+    { to: "/holder", label: "Holder" },
+    { to: "/verifier", label: "Verifier" },
+  ];
 
   const copyAddress = () => {
     if (address) {
@@ -48,7 +50,14 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
           {address && (
             <div className="flex flex-col gap-2 rounded-lg border border-slate-700 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">Logged in as:</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Logged in as:</span>
+                  {!roleLoading && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isIssuer ? "bg-primary/20 text-primary" : "bg-slate-700 text-slate-300"}`}>
+                      {isIssuer ? "Issuer" : "Holder / Verifier"}
+                    </span>
+                  )}
+                </div>
                 <code className="font-mono text-sm text-green-400 break-all">
                   {address}
                 </code>
@@ -85,7 +94,7 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
           >
             Beranda
           </NavLink>
-          {links.map((item) => (
+          {!roleLoading && links.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

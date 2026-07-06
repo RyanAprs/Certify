@@ -13,6 +13,7 @@ import App from "./pages/App";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./styles/index.css";
 import { AuthProvider } from "./context/AuthContext";
+import { RoleProvider } from "./context/RoleContext";
 
 const queryClient = new QueryClient();
 const projectId = import.meta.env.VITE_WALLETCONNECT_ID ?? "demo";
@@ -38,7 +39,9 @@ createRoot(document.getElementById("root")!).render(
         <RainbowKitProvider theme={darkTheme()}>
           <BrowserRouter>
             <AuthProvider>
-              <App />
+              <RoleProvider>
+                <App />
+              </RoleProvider>
             </AuthProvider>
           </BrowserRouter>
         </RainbowKitProvider>
