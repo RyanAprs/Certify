@@ -1,5 +1,5 @@
 {
-  "gpa": 385,
-  "minGpa": 300,
-  "studentId": 12345
+  "secret": "12345",
+  "metadataHash": "67890",
+  "minGpa": "300"
 }

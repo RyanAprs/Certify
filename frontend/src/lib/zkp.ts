@@ -14,9 +14,7 @@ export interface CertificateMetadata {
 export interface ProofInputs {
   secret: string;
   metadataHash: string;
-  actualGpa: string;
   minGpa: string;
-  nonce: string;
 }
 
 export interface ZKProof {
@@ -88,31 +86,24 @@ export function generateSecret(): string {
  */
 export async function generateGpaProof(
   metadata: CertificateMetadata,
-  minGpa: string,
-  nonce: string
+  minGpa: string
 ): Promise<ZKProof> {
   try {
     const metadataHash = generateMetadataCommitment(metadata);
     const metadataHashCircuit = hashToCircuitInput(metadataHash);
-    const actualGpa = metadata.gpa;
-    const actualGpaCircuit = gpaToCircuitInput(actualGpa);
     const minGpaCircuit = gpaToCircuitInput(minGpa);
     const secret = generateSecret();
 
     const input: ProofInputs = {
       secret: secret,
       metadataHash: metadataHashCircuit,
-      actualGpa: actualGpaCircuit,
       minGpa: minGpaCircuit,
-      nonce: nonce,
     };
 
     console.log("Generating GPA proof with inputs:", {
       secret,
       metadata: metadata.name,
-      actualGpa: `${actualGpa} => ${actualGpaCircuit}`,
       minGpa: `${minGpa} => ${minGpaCircuit}`,
-      nonce,
     });
 
     const { proof, publicSignals } = await groth16.fullProve(
@@ -211,12 +202,16 @@ export function encodeProofForContract(
         { type: "uint256[2]", name: "c" },
         { type: "uint256[]", name: "input" },
       ],
-      [pA, pB, pC, pubSignals]
+      [
+        pA.map(BigInt) as [bigint, bigint],
+        pB.map((row) => row.map(BigInt)) as [[bigint, bigint], [bigint, bigint]],
+        pC.map(BigInt) as [bigint, bigint],
+        pubSignals.map(BigInt),
+      ]
     ) as `0x${string}`;
   } else {
     // Packed encoding: all values concatenated
-    // Format: a[0], a[1], b[0][0], b[0][1], b[1][0], b[1][1], c[0], c[1], input[0], input[1], ...
-    const allValues = [...pA, ...pB[0], ...pB[1], ...pC, ...pubSignals];
+    const allValues = [...pA, ...pB[0], ...pB[1], ...pC, ...pubSignals].map(BigInt);
 
     return encodeAbiParameters(
       [{ type: "uint256[]" }],
