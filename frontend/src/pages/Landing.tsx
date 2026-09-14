@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useRole } from "../hooks/useRole";
+import { useRole } from "../context/RoleContext";
 
 export const LandingPage = () => {
   const { isConnected, isIssuer, isAdmin } = useRole();

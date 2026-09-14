@@ -1,23 +1,20 @@
 import { useForm } from "react-hook-form";
-import { useIssuerCertificates } from "../hooks/useCertificates";
-import { CertificateCard } from "./Shared";
-import { uploadFile, uploadJson } from "../lib/ipfs";
-import { keccak256, parseAbiItem, toBytes, decodeEventLog } from "viem";
-import { useLocalAccount } from "../hooks/useLocalAccount";
-import {
-  walletClient,
-  publicClient,
-  CERTIFY_CONTRACT_ADDRESS,
-  CERTIFY_ABI,
-} from "../lib/viemLocal";
-import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
+import { isAddress, parseAbiItem } from "viem";
+import toast from "react-hot-toast";
+import { useState } from "react";
 
-/* ---------- ZK imports ---------- */
+import { useIssuerCertificates } from "../hooks/useCertificates";
+import { useRegistryWrite } from "../hooks/useRegistryWrite";
+import { useRole } from "../context/RoleContext";
+import { CertificateCard, Notice, Spinner } from "./Shared";
+import { uploadFile, uploadJson } from "../lib/ipfs";
+import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
 import {
-  generateGpaProof,
-  formatProofForSolidity,
-  ZKProof,
   CertificateMetadata,
+  commitmentFromMetadata,
+  generateSecret,
 } from "../lib/zkp";
 
 interface IssueForm {
@@ -30,28 +27,60 @@ interface IssueForm {
   image: FileList;
 }
 
+function useMemberRequests(issuer?: `0x${string}`) {
+  return useQuery({
+    enabled: Boolean(issuer),
+    queryKey: ["memberRequests", issuer],
+    queryFn: async () => {
+      if (!issuer) return { pending: [] as string[], approved: [] as string[] };
+      const logs = await publicClient.getLogs({
+        address: registryContract.address,
+        event: parseAbiItem(
+          "event MemberRequested(address indexed issuer, address indexed holder)"
+        ),
+        args: { issuer },
+        fromBlock: deploymentBlock,
+        toBlock: "latest",
+      });
+      const holders = [
+        ...new Set(logs.map((l) => (l.args.holder as string).toLowerCase())),
+      ];
+      const results = await Promise.all(
+        holders.map(async (holder) => {
+          const req = (await publicClient.readContract({
+            ...registryContract,
+            functionName: "memberRequests",
+            args: [issuer, holder as `0x${string}`],
+          })) as readonly [string, boolean, boolean];
+          const [, approved, decided] = req;
+          return { holder, approved, decided };
+        })
+      );
+      return {
+        pending: results.filter((r) => !r.decided).map((r) => r.holder),
+        approved: results
+          .filter((r) => r.decided && r.approved)
+          .map((r) => r.holder),
+      };
+    },
+  });
+}
+
 export const IssuerDashboard = () => {
-  const { account, address, handleSetPrivateKey } = useLocalAccount();
-  const { data: certificates, refetch } = useIssuerCertificates(
-    address as `0x${string}`
-  );
+  const { address } = useAccount();
+  const { data: certificates } = useIssuerCertificates(address);
+  const {
+    data: members,
+    isLoading: membersLoading,
+    refetch: refetchMembers,
+  } = useMemberRequests(address);
+  const { write } = useRegistryWrite();
+  const { refreshRole } = useRole();
 
-  /* ---------- existing states ---------- */
-  const [privateKeyInput, setPrivateKeyInput] = useState("");
-  const [requests, setRequests] = useState<string[]>([]);
-  const [members, setMembers] = useState<string[]>([]);
-  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [processing, setProcessing] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
-  const [processingHolder, setProcessingHolder] = useState<string | null>(null);
 
-  /* ---------- ZK states ---------- */
-  const [zkProof, setZkProof] = useState<ZKProof | null>(null);
-  const [zkLoading, setZkLoading] = useState(false);
-  const [zkError, setZkError] = useState<string | null>(null);
-  const [minGpa] = useState("3.00"); // bisa diubah sesuai kebutuhan
-
-  const issueForm = useForm<IssueForm>({
+  const form = useForm<IssueForm>({
     defaultValues: {
       holder: "",
       name: "",
@@ -62,171 +91,37 @@ export const IssuerDashboard = () => {
     },
   });
 
-  /* ---------- existing logic (fetchRequestsAndMembers, onApprove) ---------- */
-  const fetchRequestsAndMembers = async () => {
-    if (!address) return;
-    setIsLoadingMembers(true);
+  const onDecision = async (holder: string, approve: boolean) => {
+    setProcessing(holder);
     try {
-      const current = await publicClient.getBlockNumber();
-      const logs = await publicClient.getLogs({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        event: parseAbiItem(
-          "event MemberRequested(address indexed issuer, address indexed holder)"
-        ),
-        fromBlock: 0n,
-        toBlock: "latest",
+      await write("manageMember", [holder, approve], {
+        pending: approve ? "Approving member…" : "Rejecting member…",
+        success: approve ? "Member approved" : "Member rejected",
       });
-
-      const forMe = logs.filter(
-        (l) => l.args.issuer?.toLowerCase() === address.toLowerCase()
-      );
-
-      const holders = [
-        ...new Set(forMe.map((l) => l.args.holder?.toLowerCase()).filter(Boolean) as string[]),
-      ];
-
-      const results = await Promise.all(
-        holders.map(async (holder) => {
-          try {
-            const req = await publicClient.readContract({
-              address: CERTIFY_CONTRACT_ADDRESS,
-              abi: CERTIFY_ABI,
-              functionName: "memberRequests",
-              args: [address, holder as `0x${string}`],
-            });
-
-            // readContract returns tuple: [applicant, approved, decided]
-            const [, approved, decided] = req as unknown as [string, boolean, boolean];
-
-            return {
-              holder,
-              decided: Boolean(decided),
-              approved: Boolean(approved),
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      const valid = results.filter((r) => r !== null);
-      setRequests(valid.filter((r) => !r.decided).map((r) => r.holder));
-      const approvedMembers = valid
-        .filter((r) => r.decided && r.approved)
-        .map((r) => r.holder);
-      setMembers(approvedMembers);
-
-      // Ambil nama holder dari sertifikat yang sudah pernah diterbitkan
-      const names: Record<string, string> = {};
-      await Promise.all(
-        approvedMembers.map(async (holder) => {
-          try {
-            const certIds = await publicClient.readContract({
-              address: CERTIFY_CONTRACT_ADDRESS,
-              abi: CERTIFY_ABI,
-              functionName: "getHolderCertificates",
-              args: [holder as `0x${string}`],
-            }) as bigint[];
-            // Cari sertifikat yang diterbitkan oleh issuer ini
-            for (const certId of certIds) {
-              const cert = await publicClient.readContract({
-                address: CERTIFY_CONTRACT_ADDRESS,
-                abi: CERTIFY_ABI,
-                functionName: "certificates",
-                args: [certId],
-              }) as unknown as [bigint, string, string, string, string, number, bigint];
-              // tuple: [id, issuer, holder, metadataCid, metadataCommitment, status, issuedAt]
-              const [, certIssuer, , certMetadataCid] = cert;
-              if (certIssuer.toLowerCase() === address.toLowerCase() && certMetadataCid) {
-                try {
-                  const res = await fetch(`https://gateway.pinata.cloud/ipfs/${certMetadataCid}`);
-                  const meta = await res.json();
-                  if (meta.name) { names[holder] = meta.name; break; }
-                } catch { /* skip jika IPFS gagal */ }
-              }
-            }
-          } catch { /* skip jika gagal */ }
-        })
-      );
-      setMemberNames(names);
-    } catch (err) {
-      console.error(err);
-      alert("Gagal load member");
+      await refetchMembers();
+    } catch {
+      /* toast already shown */
     } finally {
-      setIsLoadingMembers(false);
+      setProcessing(null);
     }
   };
 
-  const onApprove = async (holder: string, approve: boolean) => {
-    if (!account) return alert("Set private key first");
-    setProcessingHolder(holder);
-    try {
-      const hash = await walletClient.writeContract({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "manageMember",
-        args: [holder as `0x${string}`, approve],
-        account,
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-      await fetchRequestsAndMembers();
-      alert(approve ? "Member approved!" : "Member rejected!");
-    } catch (error) {
-      console.error(error);
-      alert("Failed to process decision");
-    } finally {
-      setProcessingHolder(null);
-    }
-  };
-
-  /* ---------- ZK helpers ---------- */
-  const handleGenerateProof = async (
-    metadata: CertificateMetadata
-  ): Promise<ZKProof | null> => {
-    setZkLoading(true);
-    setZkError(null);
-    try {
-      const proof = await generateGpaProof(metadata, minGpa);
-      setZkProof(proof);
-      return proof;
-    } catch (e: any) {
-      setZkError(e.message);
-      return null;
-    } finally {
-      setZkLoading(false);
-    }
-  };
-
-  /* ---------- issue certificate + ZK ---------- */
-  const onIssue = issueForm.handleSubmit(async (values) => {
-    if (!account) return alert("Set private key first");
+  const onIssue = form.handleSubmit(async (values) => {
     setIsIssuing(true);
-    setZkProof(null);
-    setZkError(null);
     try {
-      // Pre-check: pastikan holder sudah approved sebelum waste gas
-      const memberRequestRaw = await publicClient.readContract({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "memberRequests",
-        args: [account.address, values.holder as `0x${string}`],
-      }) as unknown as [string, boolean, boolean];
-
-      // memberRequests returns tuple: [applicant, approved, decided]
-      const [, mrApproved, mrDecided] = memberRequestRaw;
-
-      if (!mrDecided || !mrApproved) {
-        const reason = !mrDecided
-          ? "Holder belum pernah mengajukan request, atau request belum diputuskan."
-          : "Request holder telah ditolak.";
-        throw new Error(`Holder belum disetujui sebagai member. ${reason} Approve request terlebih dahulu.`);
-      }
-
       const file = values.image?.item(0);
-      if (!file) throw new Error("Certificate image required");
+      if (!file) throw new Error("Certificate image is required");
 
-      /* 1. upload IPFS */
-      const imageCid = await uploadFile(file);
+      const imageCid = await toast.promise(uploadFile(file), {
+        loading: "Uploading image to IPFS…",
+        success: "Image uploaded",
+        error: "Image upload failed",
+      });
+
+      // The secret blinds the on-chain commitment; the holder needs it later to
+      // prove their GPA. NOTE: in production this metadata should be encrypted
+      // to the holder so only they can read `secret`/`gpa`.
+      const secret = generateSecret();
       const metadata: CertificateMetadata = {
         name: values.name,
         institution: values.institution,
@@ -235,286 +130,186 @@ export const IssuerDashboard = () => {
         description: values.description,
         imageCid,
         issuedAt: new Date().toISOString(),
+        secret,
       };
+
       const metadataCid = await uploadJson(metadata);
-      const metadataCommitment = keccak256(toBytes(JSON.stringify(metadata)));
+      // Poseidon(gpa, secret) — the SAME commitment the ZK circuit reproduces,
+      // so on-chain verification can actually succeed (previously this used a
+      // keccak of unordered JSON that never matched the circuit).
+      const metadataCommitment = commitmentFromMetadata(metadata);
 
-      /* 2. generate ZK proof (optional) */
-      const proof = await handleGenerateProof(metadata);
-      if (!proof) console.warn("ZK proof skipped / failed");
-
-      console.log("Generated ZK Proof:", proof);
-
-      /* 3. issue certificate */
-      const hash = await walletClient.writeContract({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "issueCertificate",
-        args: [values.holder as `0x${string}`, metadataCid, metadataCommitment],
-        account,
-      });
-
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-      /* 4. Parse certificate ID from logs */
-      let certificateId: bigint | undefined;
-
-      // Try to find CertificateIssued event in logs
-      const certificateIssuedEvent = parseAbiItem(
-        "event CertificateIssued(uint256 indexed certificateId, address indexed issuer, address indexed holder)"
+      await write(
+        "issueCertificate",
+        [values.holder as `0x${string}`, metadataCid, metadataCommitment],
+        { pending: "Issuing certificate…", success: "Certificate issued" }
       );
-
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: [certificateIssuedEvent],
-            data: log.data,
-            topics: log.topics,
-          });
-
-          if (decoded.eventName === "CertificateIssued") {
-            certificateId = decoded.args.certificateId as bigint;
-            break;
-          }
-        } catch (e) {
-          // Skip logs that don't match
-          continue;
-        }
-      }
-
-      issueForm.reset();
-      refetch();
-
-      if (certificateId !== undefined) {
-        alert(`✅ Certificate issued! ID: ${certificateId.toString()}`);
-      } else {
-        alert("✅ Certificate issued successfully!");
-      }
-    } catch (error: any) {
-      console.error(error);
-      alert(`Issue failed: ${error.message}`);
+      form.reset();
+    } catch (err: any) {
+      if (err?.message) toast.error(err.message);
     } finally {
       setIsIssuing(false);
     }
   });
 
-  /* ---------- mount ---------- */
-  useEffect(() => {
-    const key = localStorage.getItem("privateKey");
-    if (key) setPrivateKeyInput(key);
-    fetchRequestsAndMembers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address]);
-
-  /* ---------- render ---------- */
   return (
     <section className="space-y-6">
       <header>
         <h2 className="text-xl font-semibold">Issuer Workspace</h2>
         <p className="text-sm text-slate-300">
-          Terbitkan sertifikat + unggah image ke IPFS dan kelola holder.
+          Issue certificates (with an IPFS image) and manage holder access.
         </p>
       </header>
 
-      {/* Private Key setter */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-3">
-        <h3 className="font-semibold">Set Private Key</h3>
-        <input
-          value={privateKeyInput}
-          className="input w-full"
-          placeholder="Private Key"
-          onChange={(e) => handleSetPrivateKey(e.target.value)}
-        />
-        {address && (
-          <p className="text-sm text-green-400">Connected: {address}</p>
-        )}
-      </div>
+      {/* Create Certificate */}
+      <form
+        onSubmit={onIssue}
+        className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4"
+      >
+        <h3 className="font-semibold">Create Certificate</h3>
 
-      {/* Create Certificate form */}
-      <div className="">
-        <form
-          onSubmit={onIssue}
-          className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4"
-        >
-          <h3 className="font-semibold">Create Certificate</h3>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-400">Holder</label>
-            {members.length === 0 ? (
-              <p className="text-sm text-yellow-400 rounded-lg border border-yellow-800 bg-yellow-900/20 px-3 py-2">
-                ⚠️ Belum ada member yang disetujui. Approve request holder terlebih dahulu.
-              </p>
-            ) : (
-              <select
-                className="input"
-                disabled={isIssuing}
-                {...issueForm.register("holder", { required: true })}
-              >
-                <option value="">-- Pilih Holder --</option>
-                {members.map((addr) => (
-                  <option key={addr} value={addr}>
-                    {memberNames[addr] ? `${memberNames[addr]} — ${addr}` : addr}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+        <Field label="Holder address" error={form.formState.errors.holder?.message}>
           <input
             className="input"
-            placeholder="Nama"
+            placeholder="0x…"
             disabled={isIssuing}
-            {...issueForm.register("name", { required: true })}
+            {...form.register("holder", {
+              required: "Holder address is required",
+              validate: (v) => isAddress(v) || "Invalid Ethereum address",
+            })}
           />
-          <input
-            className="input"
-            placeholder="Institusi"
-            disabled={isIssuing}
-            {...issueForm.register("institution", { required: true })}
-          />
-          <input
-            className="input"
-            placeholder="Program Studi"
-            disabled={isIssuing}
-            {...issueForm.register("program", { required: true })}
-          />
-          <input
-            className="input"
-            placeholder="GPA"
-            disabled={isIssuing}
-            {...issueForm.register("gpa", { required: true })}
-          />
-          <textarea
-            className="input min-h-[80px]"
-            placeholder="Deskripsi"
-            disabled={isIssuing}
-            {...issueForm.register("description", { required: true })}
-          />
-          <label className="text-sm text-slate-400">
-            Upload Certificate Image (PNG/JPEG)
-          </label>
-          <input
-            className="input"
-            type="file"
-            accept="image/*"
-            disabled={isIssuing}
-            {...issueForm.register("image", { required: true })}
-          />
+        </Field>
 
-          {/* ZK status */}
-          {zkLoading && (
-            <p className="text-xs text-yellow-400">⏳ Generating ZK proof...</p>
-          )}
-          {zkError && (
-            <p className="text-xs text-red-400">❌ ZK error: {zkError}</p>
-          )}
-          {zkProof && (
-            <p className="text-xs text-green-400">✅ ZK proof ready</p>
-          )}
+        <Field label="Name" error={form.formState.errors.name?.message}>
+          <input className="input" disabled={isIssuing}
+            {...form.register("name", { required: "Name is required" })} />
+        </Field>
+        <Field label="Institution">
+          <input className="input" disabled={isIssuing}
+            {...form.register("institution", { required: true })} />
+        </Field>
+        <Field label="Program">
+          <input className="input" disabled={isIssuing}
+            {...form.register("program", { required: true })} />
+        </Field>
+        <Field label="GPA (0–5)" error={form.formState.errors.gpa?.message}>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            min="0"
+            max="5"
+            disabled={isIssuing}
+            {...form.register("gpa", {
+              required: "GPA is required",
+              validate: (v) => {
+                const n = parseFloat(v);
+                return (!isNaN(n) && n >= 0 && n <= 5) || "GPA must be between 0 and 5";
+              },
+            })}
+          />
+        </Field>
+        <Field label="Description">
+          <textarea className="input min-h-[80px]" disabled={isIssuing}
+            {...form.register("description", { required: true })} />
+        </Field>
+        <Field label="Certificate image (PNG/JPEG)">
+          <input className="input" type="file" accept="image/*" disabled={isIssuing}
+            {...form.register("image", { required: true })} />
+        </Field>
 
-          <button className="btn-primary w-full" disabled={isIssuing}>
-            {isIssuing ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Issuing...
-              </span>
-            ) : (
-              "Issue Certificate"
-            )}
-          </button>
-        </form>
-      </div>
+        <button className="btn-primary w-full" disabled={isIssuing}>
+          {isIssuing ? "Issuing…" : "Issue Certificate"}
+        </button>
+      </form>
 
-      {/* Pending Requests & Approved Members */}
+      {/* Membership */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Pending Requests</h3>
           <button
-            onClick={() => fetchRequestsAndMembers()}
-            disabled={isLoadingMembers}
+            onClick={() => {
+              refetchMembers();
+              refreshRole();
+            }}
+            disabled={membersLoading}
             className="text-xs uppercase tracking-wide text-primary hover:text-primary/80 disabled:opacity-50"
           >
-            {isLoadingMembers ? "Loading..." : "Refresh"}
+            {membersLoading ? "Loading…" : "Refresh"}
           </button>
         </div>
-        {requests.length === 0 && (
+
+        {membersLoading && <Spinner label="Loading members…" />}
+        {!membersLoading && (members?.pending.length ?? 0) === 0 && (
           <p className="text-sm text-slate-400">No pending requests.</p>
         )}
-        {requests.map((holder) => (
+        {members?.pending.map((holder) => (
           <div
             key={holder}
-            className="flex md:flex-row flex-col justify-between items-center rounded-lg border border-slate-800 p-3"
+            className="flex flex-col items-center justify-between gap-3 rounded-lg border border-slate-800 p-3 md:flex-row"
           >
-            <p className="text-sm font-mono">{holder}</p>
-            <div className="flex gap-7 p-4">
+            <p className="break-all font-mono text-sm">{holder}</p>
+            <div className="flex gap-3">
               <button
-                onClick={() => onApprove(holder, true)}
-                disabled={processingHolder === holder}
+                onClick={() => onDecision(holder, true)}
+                disabled={processing === holder}
                 className="btn-secondary disabled:opacity-50"
               >
-                {processingHolder === holder ? "..." : "Approve"}
+                {processing === holder ? "…" : "Approve"}
               </button>
               <button
-                onClick={() => onApprove(holder, false)}
-                disabled={processingHolder === holder}
+                onClick={() => onDecision(holder, false)}
+                disabled={processing === holder}
                 className="btn-danger disabled:opacity-50"
               >
-                {processingHolder === holder ? "..." : "Reject"}
+                {processing === holder ? "…" : "Reject"}
               </button>
             </div>
           </div>
         ))}
 
-        <h3 className="font-semibold mt-6">Approved Members</h3>
-        {members.length === 0 && (
+        <h3 className="mt-6 font-semibold">Approved Members</h3>
+        {(members?.approved.length ?? 0) === 0 && (
           <p className="text-sm text-slate-400">No members yet.</p>
         )}
-        {members.map((member) => (
+        {members?.approved.map((member) => (
           <div key={member} className="rounded-lg border border-slate-800 p-3">
-            <p className="text-sm font-mono">{member}</p>
+            <p className="break-all font-mono text-sm">{member}</p>
           </div>
         ))}
       </div>
 
-      {/* Certificates list + ZK verify button */}
+      {/* Issued certificates */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Certificates</h3>
-          <button
-            onClick={() => refetch()}
-            className="text-xs uppercase tracking-wide text-primary"
-          >
-            Refresh
-          </button>
-        </div>
+        <h3 className="font-semibold">Certificates</h3>
         <div className="grid gap-4">
-          {certificates?.map((c) => (
-            <div
-              key={c.id.toString()}
-              className="rounded-lg border border-slate-800 p-4"
-            >
-              <CertificateCard certificate={c} />
-            </div>
-          )) || <p className="text-sm text-slate-400">No certificates yet.</p>}
+          {certificates && certificates.length > 0 ? (
+            certificates.map((c) => (
+              <CertificateCard key={c.id.toString()} certificate={c} />
+            ))
+          ) : (
+            <Notice tone="info">No certificates issued yet.</Notice>
+          )}
         </div>
       </div>
     </section>
   );
 };
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-sm text-slate-400">{label}</span>
+      {children}
+      {error && <span className="block text-xs text-red-400">{error}</span>}
+    </label>
+  );
+}

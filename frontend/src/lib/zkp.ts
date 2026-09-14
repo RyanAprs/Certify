@@ -1,6 +1,15 @@
 import { groth16 } from "snarkjs";
-import { keccak256, toBytes, encodeAbiParameters } from "viem";
+import { poseidon2 } from "poseidon-lite";
+import { toHex } from "viem";
 
+/**
+ * Certificate metadata stored on IPFS.
+ *
+ * `secret` is the blinding factor chosen at issue time. Together with the
+ * scaled GPA it opens the on-chain Poseidon commitment, so the holder needs it
+ * to generate proofs later. (In production the metadata should be encrypted so
+ * only the holder can read `secret`/`gpa`.)
+ */
 export interface CertificateMetadata {
   name: string;
   institution: string;
@@ -9,12 +18,7 @@ export interface CertificateMetadata {
   description: string;
   imageCid: string;
   issuedAt: string;
-}
-
-export interface ProofInputs {
-  secret: string;
-  metadataHash: string;
-  minGpa: string;
+  secret: string; // decimal string, field element < BN254 scalar order
 }
 
 export interface ZKProof {
@@ -23,239 +27,133 @@ export interface ZKProof {
     pi_b: string[][];
     pi_c: string[];
   };
+  // [0] = commitment, [1] = minGpa
   publicSignals: string[];
 }
 
-/**
- * Generate deterministic metadata commitment (hash)
- * Uses canonical JSON ordering to ensure reproducible hashes
- */
-export function generateMetadataCommitment(
-  metadata: CertificateMetadata
-): `0x${string}` {
-  const canonical = JSON.stringify({
-    description: metadata.description,
-    gpa: metadata.gpa,
-    imageCid: metadata.imageCid,
-    institution: metadata.institution,
-    issuedAt: metadata.issuedAt,
-    name: metadata.name,
-    program: metadata.program,
-  });
-  return keccak256(toBytes(canonical));
-}
+// BN254 scalar field order.
+const FIELD_ORDER =
+  21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
 /**
- * Convert GPA string to circuit input (multiply by 100, no rounding)
- * Example: "3.75" => "375", "4.0" => "400"
- * Uses floor to avoid rounding errors
+ * Scale a GPA string to the circuit's integer domain (× 100, floored).
+ * "3.75" -> 375, "4.0" -> 400. Valid range 0..500.
  */
-export function gpaToCircuitInput(gpa: string): string {
-  const gpaFloat = parseFloat(gpa);
-  if (isNaN(gpaFloat) || gpaFloat < 0 || gpaFloat > 5) {
-    throw new Error("Invalid GPA format: must be 0-5");
+export function gpaToCircuitInput(gpa: string): number {
+  const value = parseFloat(gpa);
+  if (isNaN(value) || value < 0 || value > 5) {
+    throw new Error("Invalid GPA: must be a number between 0 and 5");
   }
-  return Math.floor(gpaFloat * 100).toString();
+  return Math.floor(value * 100);
 }
 
-/**
- * Convert hash to circuit input (remove 0x prefix and convert to decimal)
- */
-export function hashToCircuitInput(hash: `0x${string}`): string {
-  const hexValue = hash.slice(2);
-  return BigInt("0x" + hexValue).toString();
-}
-
-/**
- * Generate a cryptographically secure random secret (256-bit)
- */
+/** Generate a cryptographically secure blinding secret as a field element. */
 export function generateSecret(): string {
-  const randomBytes = new Uint8Array(32);
-  crypto.getRandomValues(randomBytes);
-  return (
-    "0x" +
-    Array.from(randomBytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
-  );
+  const bytes = new Uint8Array(31); // 248 bits < field order, always in range
+  crypto.getRandomValues(bytes);
+  let value = 0n;
+  for (const b of bytes) value = (value << 8n) | BigInt(b);
+  return (value % FIELD_ORDER).toString();
 }
 
 /**
- * Generate ZK proof for GPA verification
- * Proves: actualGpa >= minGpa with commitment to metadata
+ * Poseidon(gpaScaled, secret) — the same hash the circuit computes. Returned as
+ * a 32-byte hex string so it can be stored on-chain as `metadataCommitment`.
+ */
+export function computeCommitment(
+  gpaScaled: number,
+  secret: string
+): `0x${string}` {
+  const hash = poseidon2([BigInt(gpaScaled), BigInt(secret)]);
+  return toHex(hash, { size: 32 });
+}
+
+/** Convenience: commitment straight from metadata. */
+export function commitmentFromMetadata(
+  metadata: Pick<CertificateMetadata, "gpa" | "secret">
+): `0x${string}` {
+  return computeCommitment(gpaToCircuitInput(metadata.gpa), metadata.secret);
+}
+
+/**
+ * Generate a Groth16 proof that the holder's GPA ≥ minGpa, bound to the
+ * certificate commitment, without revealing the GPA.
  */
 export async function generateGpaProof(
   metadata: CertificateMetadata,
   minGpa: string
 ): Promise<ZKProof> {
-  try {
-    const metadataHash = generateMetadataCommitment(metadata);
-    const metadataHashCircuit = hashToCircuitInput(metadataHash);
-    const minGpaCircuit = gpaToCircuitInput(minGpa);
-    const secret = generateSecret();
-
-    const input: ProofInputs = {
-      secret: secret,
-      metadataHash: metadataHashCircuit,
-      minGpa: minGpaCircuit,
-    };
-
-    console.log("Generating GPA proof with inputs:", {
-      secret,
-      metadata: metadata.name,
-      minGpa: `${minGpa} => ${minGpaCircuit}`,
-    });
-
-    const { proof, publicSignals } = await groth16.fullProve(
-      input,
-      "/zk/certify.wasm",
-      "/zk/certify.zkey"
-    );
-
-    console.log("Proof generated. Public signals:", publicSignals);
-
-    return {
-      proof: {
-        pi_a: proof.pi_a.slice(0, 2).map((x: any) => x.toString()),
-        pi_b: proof.pi_b
-          .slice(0, 2)
-          .map((row: any[]) => row.slice(0, 2).map((x: any) => x.toString())),
-        pi_c: proof.pi_c.slice(0, 2).map((x: any) => x.toString()),
-      },
-      publicSignals: publicSignals.map((x: any) => x.toString()),
-    };
-  } catch (error: any) {
-    console.error("ZK proof generation failed:", error);
-    throw new Error(
-      `Failed to generate zero-knowledge proof: ${error.message}`
-    );
+  const gpaScaled = gpaToCircuitInput(metadata.gpa);
+  const minScaled = gpaToCircuitInput(minGpa);
+  if (!metadata.secret) {
+    throw new Error("Certificate metadata is missing its secret blinding factor");
   }
-}
 
-/**
- * Verify ZK proof locally using verification key
- */
-export async function verifyProof(zkProof: ZKProof): Promise<boolean> {
-  try {
-    console.log("Fetching verification key...");
-    const vKeyResponse = await fetch("/zk/verification_key.json");
+  const input = {
+    gpa: gpaScaled,
+    secret: metadata.secret,
+    minGpa: minScaled,
+  };
 
-    if (!vKeyResponse.ok) {
-      throw new Error("Failed to fetch verification key");
-    }
-
-    const vKey = await vKeyResponse.json();
-    console.log("Verification key loaded");
-
-    console.log("Verifying proof...");
-    const verified = await groth16.verify(
-      vKey,
-      zkProof.publicSignals,
-      zkProof.proof
-    );
-
-    console.log("Verification result:", verified);
-    return verified;
-  } catch (error: any) {
-    console.error("ZK proof verification failed:", error);
-    throw new Error(`Failed to verify proof: ${error.message}`);
-  }
-}
-
-/**
- * Format proof for Solidity verifier contract
- * This matches the standard Groth16 verifier format
- */
-export function formatProofForSolidity(zkProof: ZKProof) {
-  const pA = zkProof.proof.pi_a.slice(0, 2); // [2]
-  const pB = zkProof.proof.pi_b.slice(0, 2).map((row) => row.slice(0, 2)); // [2][2]
-  const pC = zkProof.proof.pi_c.slice(0, 2); // [2]
-  const pubSignals = zkProof.publicSignals;
+  const { proof, publicSignals } = await groth16.fullProve(
+    input,
+    "/zk/certify.wasm",
+    "/zk/certify.zkey"
+  );
 
   return {
-    pA,
-    pB,
-    pC,
-    pubSignals,
+    proof: {
+      pi_a: proof.pi_a.map((x: any) => x.toString()),
+      pi_b: proof.pi_b.map((row: any[]) => row.map((x: any) => x.toString())),
+      pi_c: proof.pi_c.map((x: any) => x.toString()),
+    },
+    publicSignals: publicSignals.map((x: any) => x.toString()),
   };
 }
 
-/**
- * Encode proof as bytes for contract call
- * Format depends on your ZKVerifier contract implementation
- *
- * Option 1: Standard Groth16 format (a, b, c, input)
- * Option 2: Packed format with all components
- */
-export function encodeProofForContract(
-  zkProof: ZKProof,
-  format: "standard" | "packed" = "standard"
-): `0x${string}` {
-  const { pA, pB, pC, pubSignals } = formatProofForSolidity(zkProof);
-
-  if (format === "standard") {
-    // Standard encoding: (uint[2] a, uint[2][2] b, uint[2] c, uint[] input)
-    return encodeAbiParameters(
-      [
-        { type: "uint256[2]", name: "a" },
-        { type: "uint256[2][2]", name: "b" },
-        { type: "uint256[2]", name: "c" },
-        { type: "uint256[]", name: "input" },
-      ],
-      [
-        pA.map(BigInt) as [bigint, bigint],
-        pB.map((row) => row.map(BigInt)) as [[bigint, bigint], [bigint, bigint]],
-        pC.map(BigInt) as [bigint, bigint],
-        pubSignals.map(BigInt),
-      ]
-    ) as `0x${string}`;
-  } else {
-    // Packed encoding: all values concatenated
-    const allValues = [...pA, ...pB[0], ...pB[1], ...pC, ...pubSignals].map(BigInt);
-
-    return encodeAbiParameters(
-      [{ type: "uint256[]" }],
-      [allValues]
-    ) as `0x${string}`;
-  }
+/** Verify a proof locally against the verification key. */
+export async function verifyProof(zkProof: ZKProof): Promise<boolean> {
+  const vKey = await (await fetch("/zk/verification_key.json")).json();
+  return groth16.verify(vKey, zkProof.publicSignals, zkProof.proof);
 }
 
 /**
- * Validate that ZK files exist
+ * Format a proof for the Solidity Groth16 verifier.
+ *
+ * IMPORTANT: snarkjs' G2 point (`pi_b`) coordinate pairs must be reversed for
+ * the on-chain verifier. This matches `snarkjs.groth16.exportSolidityCallData`.
  */
+export function formatProofForSolidity(zkProof: ZKProof) {
+  const { pi_a, pi_b, pi_c } = zkProof.proof;
+  const a: [bigint, bigint] = [BigInt(pi_a[0]), BigInt(pi_a[1])];
+  const b: [[bigint, bigint], [bigint, bigint]] = [
+    [BigInt(pi_b[0][1]), BigInt(pi_b[0][0])],
+    [BigInt(pi_b[1][1]), BigInt(pi_b[1][0])],
+  ];
+  const c: [bigint, bigint] = [BigInt(pi_c[0]), BigInt(pi_c[1])];
+  const pubSignals = zkProof.publicSignals.map((x) => BigInt(x)) as [
+    bigint,
+    bigint
+  ];
+  return { a, b, c, pubSignals };
+}
+
+/** Check that the ZK artifacts have been built and published. */
 export async function validateZkFiles(): Promise<{
   wasm: boolean;
   zkey: boolean;
   vkey: boolean;
 }> {
-  const results = {
-    wasm: false,
-    zkey: false,
-    vkey: false,
+  const check = async (path: string) => {
+    try {
+      return (await fetch(path, { method: "HEAD" })).ok;
+    } catch {
+      return false;
+    }
   };
-
-  try {
-    const wasmResponse = await fetch("/zk/certify.wasm", { method: "HEAD" });
-    results.wasm = wasmResponse.ok;
-  } catch (e) {
-    console.error("WASM file not found");
-  }
-
-  try {
-    const zkeyResponse = await fetch("/zk/certify.zkey", { method: "HEAD" });
-    results.zkey = zkeyResponse.ok;
-  } catch (e) {
-    console.error("ZKEY file not found");
-  }
-
-  try {
-    const vkeyResponse = await fetch("/zk/verification_key.json", {
-      method: "HEAD",
-    });
-    results.vkey = vkeyResponse.ok;
-  } catch (e) {
-    console.error("Verification key file not found");
-  }
-
-  return results;
+  return {
+    wasm: await check("/zk/certify.wasm"),
+    zkey: await check("/zk/certify.zkey"),
+    vkey: await check("/zk/verification_key.json"),
+  };
 }

@@ -1,36 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { WagmiProvider, createConfig, http } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  RainbowKitProvider,
-  darkTheme,
-  getDefaultWallets,
-} from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import { Toaster } from "react-hot-toast";
 import App from "./pages/App";
+import { wagmiConfig } from "./lib/wagmi";
+import { RoleProvider } from "./context/RoleContext";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./styles/index.css";
-import { AuthProvider } from "./context/AuthContext";
-import { RoleProvider } from "./context/RoleContext";
 
 const queryClient = new QueryClient();
-const projectId = import.meta.env.VITE_WALLETCONNECT_ID ?? "demo";
-
-const { connectors } = getDefaultWallets({
-  appName: "Certify",
-  projectId,
-  chains: [sepolia],
-});
-
-const wagmiConfig = createConfig({
-  chains: [sepolia],
-  transports: {
-    [sepolia.id]: http(import.meta.env.VITE_RPC_URL),
-  },
-  connectors,
-});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -38,11 +19,19 @@ createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={darkTheme()}>
           <BrowserRouter>
-            <AuthProvider>
-              <RoleProvider>
-                <App />
-              </RoleProvider>
-            </AuthProvider>
+            <RoleProvider>
+              <App />
+            </RoleProvider>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: "#0f172a",
+                  color: "#e2e8f0",
+                  border: "1px solid #1e293b",
+                },
+              }}
+            />
           </BrowserRouter>
         </RainbowKitProvider>
       </QueryClientProvider>

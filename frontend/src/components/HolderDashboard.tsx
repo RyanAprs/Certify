@@ -1,176 +1,113 @@
 import { useForm } from "react-hook-form";
+import { useAccount } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
+import { isAddress, keccak256, parseAbiItem, toBytes } from "viem";
+import toast from "react-hot-toast";
+import { useState } from "react";
+
 import { useHolderCertificates } from "../hooks/useCertificates";
-import { CertificateCard } from "./Shared";
-import { keccak256, toBytes, encodePacked, parseAbiItem } from "viem";
+import { useRegistryWrite } from "../hooks/useRegistryWrite";
+import { CertificateCard, Notice, Spinner } from "./Shared";
 import { uploadJson } from "../lib/ipfs";
-import { useEffect, useState } from "react";
-import { useLocalAccount } from "../hooks/useLocalAccount";
-import {
-  writeContractFresh,
-  CERTIFY_CONTRACT_ADDRESS,
-  CERTIFY_ABI,
-  walletClient,
-  publicClient,
-} from "../lib/viemLocal";
+import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
 
 interface MembershipForm {
   issuer: string;
 }
-
 interface ShareForm {
   certificateId: string;
   verifier: string;
   fields: string;
 }
 
-export const HolderDashboard = () => {
-  const { account, address, handleSetPrivateKey } = useLocalAccount();
-  const { data: certificates } = useHolderCertificates(
-    address as `0x${string}`
-  );
-  const [lastProof, setLastProof] = useState<string | null>(null);
-  const [isRequestingMembership, setIsRequestingMembership] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [privateKeyInput, setPrivateKeyInput] = useState("");
-  // state tambahan
-  const [memberships, setMemberships] = useState<`0x${string}`[]>([]);
-  const [isChecking, setIsChecking] = useState(true);
-
-  // helper baca log MemberDecision
-  const fetchMemberships = async () => {
-    if (!address) return;
-    setIsChecking(true);
-    try {
-      const current = await publicClient.getBlockNumber();
+function useMemberships(holder?: `0x${string}`) {
+  return useQuery({
+    enabled: Boolean(holder),
+    queryKey: ["memberships", holder],
+    queryFn: async () => {
+      if (!holder) return [] as string[];
       const logs = await publicClient.getLogs({
-        address: CERTIFY_CONTRACT_ADDRESS,
+        address: registryContract.address,
         event: parseAbiItem(
           "event MemberDecision(address indexed issuer, address indexed holder, bool approved)"
         ),
-        fromBlock: 0n,
+        args: { holder },
+        fromBlock: deploymentBlock,
         toBlock: "latest",
       });
-
-      // ambil issuer yg sudah approve holder ini
-      const approved = logs
-        .filter(
-          (l) =>
-            l.args.holder?.toLowerCase() === address.toLowerCase() &&
-            l.args.approved
-        )
-        .map((l) => l.args.issuer)
-        .filter((issuer): issuer is `0x${string}` => !!issuer);
-
-      // hilangkan duplikat
-      setMemberships([...new Set(approved)]);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  // panggil sekali saat mount & tiap address berubah
-  useEffect(() => {
-    fetchMemberships();
-  }, [address]);
-
-  const membershipForm = useForm<MembershipForm>({
-    defaultValues: { issuer: "" },
-  });
-  const shareForm = useForm<ShareForm>({
-    defaultValues: {
-      certificateId: "",
-      verifier: "",
-      fields: '{"name":"Jane Doe"}',
+      return [
+        ...new Set(
+          logs.filter((l) => l.args.approved).map((l) => l.args.issuer as string)
+        ),
+      ];
     },
   });
+}
 
-  useEffect(() => {
-    const key = localStorage.getItem("privateKey");
-    if (key) {
-      setPrivateKeyInput(key);
-    }
-  }, []);
+export const HolderDashboard = () => {
+  const { address } = useAccount();
+  const { data: certificates, isLoading: certsLoading } =
+    useHolderCertificates(address);
+  const { data: memberships, isLoading: membershipsLoading } =
+    useMemberships(address);
+  const { write } = useRegistryWrite();
+
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const membershipForm = useForm<MembershipForm>({ defaultValues: { issuer: "" } });
+  const shareForm = useForm<ShareForm>({
+    defaultValues: { certificateId: "", verifier: "", fields: "{}" },
+  });
 
   const onMembership = membershipForm.handleSubmit(async (values) => {
-    if (!account) return alert("Set private key first");
+    setIsRequesting(true);
     try {
-      setIsRequestingMembership(true);
-
-      // Pre-check: pastikan target address adalah registered issuer
-      const isRegistered = await publicClient.readContract({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "registeredIssuers",
-        args: [values.issuer as `0x${string}`],
-      });
-
-      if (!isRegistered) {
-        alert(`❌ Address ${values.issuer} bukan Issuer yang terdaftar di sistem. Pastikan address yang Anda masukkan sudah benar.`);
-        return;
-      }
-
-      await writeContractFresh({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "requestMembership",
-        args: [values.issuer as `0x${string}`],
-        account,
+      await write("requestMembership", [values.issuer as `0x${string}`], {
+        pending: "Requesting membership…",
+        success: "Membership request sent",
       });
       membershipForm.reset();
-      alert("✅ Membership request berhasil dikirim!");
-    } catch (error: any) {
-      console.error("Membership request failed:", error);
-      alert(`❌ Gagal mengirim request: ${error.message}`);
+    } catch {
+      /* toast shown */
     } finally {
-      setIsRequestingMembership(false);
+      setIsRequesting(false);
     }
   });
 
   const onShare = shareForm.handleSubmit(async (values) => {
-    if (!account) return alert("Set private key first");
+    setIsSharing(true);
     try {
-      setIsSharing(true);
-      const payload = JSON.parse(values.fields);
-      const queryHash = keccak256(toBytes(JSON.stringify(payload)));
+      let payload: unknown;
+      try {
+        payload = JSON.parse(values.fields);
+      } catch {
+        throw new Error("Disclosed fields must be valid JSON");
+      }
       const certificate = certificates?.find(
         (c) => c.id === BigInt(values.certificateId)
       );
-      if (!certificate) throw new Error("Certificate not found");
-      const digest = keccak256(
-        encodePacked(
-          ["bytes32", "bytes32"],
-          [certificate.metadataCommitment as `0x${string}`, queryHash]
-        )
-      );
-      const signature = await walletClient.signMessage({
-        account,
-        message: { raw: digest },
-      });
+      if (!certificate) throw new Error("Certificate not found in your wallet");
+
+      const queryHash = keccak256(toBytes(JSON.stringify(payload)));
       const encryptedPayloadCid = await uploadJson({
         payload,
-        sharedAt: Date.now(),
-        signature,
+        sharedAt: new Date().toISOString(),
       });
-      await writeContractFresh({
-        address: CERTIFY_CONTRACT_ADDRESS,
-        abi: CERTIFY_ABI,
-        functionName: "shareCertificate",
-        args: [
+
+      await write(
+        "shareCertificate",
+        [
           BigInt(values.certificateId),
           values.verifier as `0x${string}`,
           queryHash,
           encryptedPayloadCid,
         ],
-        account,
-      });
-      setLastProof(signature);
+        { pending: "Sharing certificate…", success: "Certificate shared" }
+      );
       shareForm.reset();
-      alert("Certificate shared successfully!");
-    } catch (error) {
-      console.error("Share certificate failed:", error);
-      alert("Failed to share certificate. Please try again.");
+    } catch (err: any) {
+      if (err?.message) toast.error(err.message);
     } finally {
       setIsSharing(false);
     }
@@ -181,26 +118,12 @@ export const HolderDashboard = () => {
       <header>
         <h2 className="text-xl font-semibold">Holder Workspace</h2>
         <p className="text-sm text-slate-300">
-          Kelola akses sertifikat dan selective disclosure.
+          Manage certificate access and selective disclosure.
         </p>
       </header>
 
-      {/* Input Private Key */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-3">
-        <h3 className="font-semibold">Set Private Key</h3>
-        <input
-          value={privateKeyInput}
-          className="input w-full"
-          placeholder="Private Key"
-          onChange={(e) => handleSetPrivateKey(e.target.value)}
-        />
-        {address && (
-          <p className="text-sm text-green-400">Connected: {address}</p>
-        )}
-      </div>
-
-      {/* Forms */}
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Join issuer */}
         <form
           onSubmit={onMembership}
           className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4"
@@ -208,49 +131,24 @@ export const HolderDashboard = () => {
           <h3 className="font-semibold">Join Issuer</h3>
           <input
             className="input"
-            placeholder="Issuer address"
-            disabled={isRequestingMembership}
-            {...membershipForm.register("issuer", { required: true })}
+            placeholder="Issuer address (0x…)"
+            disabled={isRequesting}
+            {...membershipForm.register("issuer", {
+              required: "Issuer address is required",
+              validate: (v) => isAddress(v) || "Invalid Ethereum address",
+            })}
           />
-          <button
-            className="btn-primary w-full"
-            disabled={isRequestingMembership}
-          >
-            {isRequestingMembership ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Processing...
-              </span>
-            ) : (
-              "Request Access"
-            )}
-          </button>
-          {isRequestingMembership && (
-            <p className="text-xs text-yellow-400 animate-pulse">
-              ⏳ Waiting for transaction confirmation...
+          {membershipForm.formState.errors.issuer && (
+            <p className="text-xs text-red-400">
+              {membershipForm.formState.errors.issuer.message}
             </p>
           )}
+          <button className="btn-primary w-full" disabled={isRequesting}>
+            {isRequesting ? "Processing…" : "Request Access"}
+          </button>
         </form>
 
+        {/* Share certificate */}
         <form
           onSubmit={onShare}
           className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4"
@@ -264,9 +162,12 @@ export const HolderDashboard = () => {
           />
           <input
             className="input"
-            placeholder="Verifier address"
+            placeholder="Verifier address (0x…)"
             disabled={isSharing}
-            {...shareForm.register("verifier", { required: true })}
+            {...shareForm.register("verifier", {
+              required: "Verifier address is required",
+              validate: (v) => isAddress(v) || "Invalid Ethereum address",
+            })}
           />
           <textarea
             className="input min-h-[120px]"
@@ -274,72 +175,48 @@ export const HolderDashboard = () => {
             disabled={isSharing}
             {...shareForm.register("fields", { required: true })}
           />
+          {shareForm.formState.errors.verifier && (
+            <p className="text-xs text-red-400">
+              {shareForm.formState.errors.verifier.message}
+            </p>
+          )}
           <button className="btn-secondary w-full" disabled={isSharing}>
-            {isSharing ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Processing...
-              </span>
-            ) : (
-              "Share Selectively"
-            )}
+            {isSharing ? "Processing…" : "Share Selectively"}
           </button>
-          {isSharing && (
-            <p className="text-xs text-yellow-400 animate-pulse">
-              ⏳ Signing and uploading to IPFS...
-            </p>
-          )}
-          {lastProof && !isSharing && (
-            <p className="text-xs text-slate-400 break-all">
-              Latest selective disclosure proof signature:
-              <br />
-              {lastProof}
-            </p>
-          )}
         </form>
       </div>
 
-      {/* Certificates List */}
+      {/* Memberships */}
       <div className="space-y-3">
-        {/* status keanggotaan */}
-        {!isChecking && memberships.length > 0 && (
+        {membershipsLoading && <Spinner label="Checking memberships…" />}
+        {!membershipsLoading && (memberships?.length ?? 0) > 0 && (
           <div className="rounded-lg border border-green-700 bg-green-900/30 p-3">
-            <p className="text-sm text-green-300">✅ You're a member of:</p>
+            <p className="text-sm text-green-300">✅ You are a member of:</p>
             <ul className="mt-1 list-inside list-disc text-xs text-green-200">
-              {memberships.map((m) => (
-                <li key={m}>{m}</li>
+              {memberships?.map((m) => (
+                <li key={m} className="break-all">
+                  {m}
+                </li>
               ))}
             </ul>
           </div>
         )}
-        
-        <h3 className="font-semibold">Certificates</h3>
+      </div>
 
-        {/* daftar sertifikat (tetap seperti semula) */}
-        <div className="grid gap-4">
-          {certificates?.map((c) => (
-            <CertificateCard key={c.id.toString()} certificate={c} />
-          )) || <p className="text-sm text-slate-400">Belum ada sertifikat.</p>}
-        </div>
+      {/* Certificates */}
+      <div className="space-y-3">
+        <h3 className="font-semibold">Certificates</h3>
+        {certsLoading ? (
+          <Spinner label="Loading certificates…" />
+        ) : certificates && certificates.length > 0 ? (
+          <div className="grid gap-4">
+            {certificates.map((c) => (
+              <CertificateCard key={c.id.toString()} certificate={c} />
+            ))}
+          </div>
+        ) : (
+          <Notice tone="info">You don't have any certificates yet.</Notice>
+        )}
       </div>
     </section>
   );

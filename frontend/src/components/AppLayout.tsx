@@ -1,27 +1,16 @@
 import { Link, NavLink } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAuth } from "../context/AuthContext";
 import { useRole } from "../context/RoleContext";
-import { useState } from "react";
 
 export const AppLayout = ({ children }: { children: React.ReactNode }) => {
-  const { address, logout } = useAuth();
-  const { isIssuer, roleLoading } = useRole();
-  const [copied, setCopied] = useState(false);
+  const { isIssuer, isAdmin, isConnected } = useRole();
+  const canIssue = isIssuer || isAdmin;
 
   const links = [
-    ...(isIssuer ? [{ to: "/issuer", label: "Issuer" }] : []),
+    ...(canIssue ? [{ to: "/issuer", label: "Issuer" }] : []),
     { to: "/holder", label: "Holder" },
     { to: "/verifier", label: "Verifier" },
   ];
-
-  const copyAddress = () => {
-    if (address) {
-      navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -40,47 +29,15 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </h1>
               <p className="text-slate-300">ZKP + IPFS + React + Solidity</p>
             </div>
-            {/* <ConnectButton
+            <ConnectButton
               accountStatus="address"
               showBalance={false}
-              chainStatus="name"
-            /> */}
+              chainStatus="icon"
+            />
           </div>
-
-          {address && (
-            <div className="flex flex-col gap-2 rounded-lg border border-slate-700 bg-slate-900/50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Logged in as:</span>
-                  {!roleLoading && (
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isIssuer ? "bg-primary/20 text-primary" : "bg-slate-700 text-slate-300"}`}>
-                      {isIssuer ? "Issuer" : "Holder / Verifier"}
-                    </span>
-                  )}
-                </div>
-                <code className="font-mono text-sm text-green-400 break-all">
-                  {address}
-                </code>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={copyAddress}
-                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
-                >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-                <button
-                  onClick={logout}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          )}
         </header>
 
-        <nav className="flex flex-wrap gap-3">
+        <nav className="flex flex-wrap gap-3" aria-label="Primary">
           <NavLink
             to="/"
             className={({ isActive }) =>
@@ -92,23 +49,24 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
             }
             end
           >
-            Beranda
+            Home
           </NavLink>
-          {!roleLoading && links.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                  isActive
-                    ? "bg-primary text-white"
-                    : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {isConnected &&
+            links.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                    isActive
+                      ? "bg-primary text-white"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
         </nav>
 
         {children}
