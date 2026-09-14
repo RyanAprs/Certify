@@ -1,0 +1,11 @@
+{
+  "name": "certify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Decentralized academic & competency credential registry with zero-knowledge proofs",
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "start": "bash scripts/dev.sh",
+    "zk:build": "cd zk && npm install && ./build.sh"
+  }
+}

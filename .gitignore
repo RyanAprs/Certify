@@ -11,3 +11,5 @@ coverage
 logs
 ecosystem.config.js
 *.log
+.dev-logs
+contracts/deployments
