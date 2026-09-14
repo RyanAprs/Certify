@@ -16,6 +16,7 @@ import {
 import toast from "react-hot-toast";
 import { Certificate, CertificateStatus } from "../types";
 import { fetchJson, ipfsUrl } from "../lib/ipfs";
+import { getSchema } from "../lib/schemas";
 
 /* ---------------- helpers ---------------- */
 
@@ -241,7 +242,8 @@ interface CertificateMetadata {
   name: string;
   institution: string;
   program: string;
-  gpa?: string;
+  type?: string;
+  claims?: Record<string, number>;
   description?: string;
   imageCid?: string;
   issuedAt?: string;
@@ -252,6 +254,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   const [copied, setCopied] = useState(false);
   const issued = Number(certificate.issuedAt) * 1000;
+  const schema = getSchema(certificate.schemaId);
 
   useEffect(() => {
     let mounted = true;
@@ -276,7 +279,8 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
       {/* Ruled masthead — a document header, not an eyebrow kicker */}
       <div className="flex items-center justify-between border-b border-line bg-sunken/60 px-5 py-3">
         <span className="font-mono text-xs text-ink-subtle">
-          Certificate №{certificate.id.toString().padStart(4, "0")}
+          №{certificate.id.toString().padStart(4, "0")}
+          {schema ? ` · ${schema.label}` : ""}
         </span>
         <StatusBadge status={certificate.status} />
       </div>
@@ -301,10 +305,22 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
                     {metadata.program} · {metadata.institution}
                   </p>
                 </div>
-                {metadata.gpa && (
-                  <div className="inline-flex items-baseline gap-1.5 rounded-md bg-sunken px-2.5 py-1">
-                    <span className="text-xs text-ink-subtle">GPA</span>
-                    <span className="font-mono text-sm font-semibold text-ink">{metadata.gpa}</span>
+                {schema && metadata.claims && (
+                  <div className="flex flex-wrap gap-2">
+                    {schema.claims.map((f) =>
+                      metadata.claims?.[f.key] !== undefined ? (
+                        <div
+                          key={f.key}
+                          className="inline-flex items-baseline gap-1.5 rounded-md bg-sunken px-2.5 py-1"
+                        >
+                          <span className="text-xs text-ink-subtle">{f.label}</span>
+                          <span className="font-mono text-sm font-semibold text-ink">
+                            {metadata.claims[f.key]}
+                            {f.unit ?? ""}
+                          </span>
+                        </div>
+                      ) : null
+                    )}
                   </div>
                 )}
                 {metadata.description && (

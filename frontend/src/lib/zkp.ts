@@ -1,104 +1,101 @@
 import { groth16 } from "snarkjs";
-import { poseidon2 } from "poseidon-lite";
-import { toHex } from "viem";
+import {
+  MERKLE_DEPTH,
+  buildClaimTree,
+  keyHash,
+  merklePath,
+  randomSalt,
+  ClaimInput,
+} from "./merkle";
+import { Schema, ClaimField, scaleClaim } from "./schemas";
 
 /**
- * Certificate metadata stored on IPFS.
+ * Credential metadata stored on IPFS.
  *
- * `secret` is the blinding factor chosen at issue time. Together with the
- * scaled GPA it opens the on-chain Poseidon commitment, so the holder needs it
- * to generate proofs later. (In production the metadata should be encrypted so
- * only the holder can read `secret`/`gpa`.)
+ * `claims` are the raw human values; `salts` blind each claim leaf. Together
+ * with the schema they reproduce the Merkle root stored on-chain, so the holder
+ * can generate range proofs later. (In production this should be encrypted so
+ * only the holder can read claim values.)
  */
-export interface CertificateMetadata {
+export interface CredentialMetadata {
+  schemaId: `0x${string}`;
+  type: string;
   name: string;
   institution: string;
   program: string;
-  gpa: string;
   description: string;
   imageCid: string;
   issuedAt: string;
-  secret: string; // decimal string, field element < BN254 scalar order
+  claims: Record<string, number>;
+  salts: Record<string, string>;
 }
 
 export interface ZKProof {
-  proof: {
-    pi_a: string[];
-    pi_b: string[][];
-    pi_c: string[];
-  };
-  // [0] = commitment, [1] = minGpa
+  proof: { pi_a: string[]; pi_b: string[][]; pi_c: string[] };
+  // [0] = root, [1] = keyHash, [2] = threshold
   publicSignals: string[];
 }
 
-// BN254 scalar field order.
-const FIELD_ORDER =
-  21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-
-/**
- * Scale a GPA string to the circuit's integer domain (× 100, floored).
- * "3.75" -> 375, "4.0" -> 400. Valid range 0..500.
- */
-export function gpaToCircuitInput(gpa: string): number {
-  const value = parseFloat(gpa);
-  if (isNaN(value) || value < 0 || value > 5) {
-    throw new Error("Invalid GPA: must be a number between 0 and 5");
-  }
-  return Math.floor(value * 100);
-}
-
-/** Generate a cryptographically secure blinding secret as a field element. */
-export function generateSecret(): string {
-  const bytes = new Uint8Array(31); // 248 bits < field order, always in range
-  crypto.getRandomValues(bytes);
-  let value = 0n;
-  for (const b of bytes) value = (value << 8n) | BigInt(b);
-  return (value % FIELD_ORDER).toString();
+/** Scaled claim inputs (key → integer) in the schema's leaf order. */
+function claimInputs(schema: Schema, meta: CredentialMetadata): ClaimInput[] {
+  return schema.claims.map((f) => ({
+    key: f.key,
+    value: BigInt(scaleClaim(f, meta.claims[f.key])),
+    salt: BigInt(meta.salts[f.key]),
+  }));
 }
 
 /**
- * Poseidon(gpaScaled, secret) — the same hash the circuit computes. Returned as
- * a 32-byte hex string so it can be stored on-chain as `metadataCommitment`.
+ * Issue-time: build the credential's Merkle commitment. Generates a salt per
+ * claim and returns the root plus the salts to persist in the metadata.
  */
-export function computeCommitment(
-  gpaScaled: number,
-  secret: string
-): `0x${string}` {
-  const hash = poseidon2([BigInt(gpaScaled), BigInt(secret)]);
-  return toHex(hash, { size: 32 });
-}
-
-/** Convenience: commitment straight from metadata. */
-export function commitmentFromMetadata(
-  metadata: Pick<CertificateMetadata, "gpa" | "secret">
-): `0x${string}` {
-  return computeCommitment(gpaToCircuitInput(metadata.gpa), metadata.secret);
+export function buildCommitment(
+  schema: Schema,
+  rawClaims: Record<string, number>
+): { rootHex: `0x${string}`; salts: Record<string, string> } {
+  const salts: Record<string, string> = {};
+  const claims: ClaimInput[] = schema.claims.map((f) => {
+    const salt = randomSalt();
+    salts[f.key] = salt.toString();
+    return { key: f.key, value: BigInt(scaleClaim(f, rawClaims[f.key])), salt };
+  });
+  const { rootHex } = buildClaimTree(claims);
+  return { rootHex, salts };
 }
 
 /**
- * Generate a Groth16 proof that the holder's GPA ≥ minGpa, bound to the
- * certificate commitment, without revealing the GPA.
+ * Prove that a single claim's value ≥ threshold, bound to the credential's
+ * Merkle root, without revealing the value.
  */
-export async function generateGpaProof(
-  metadata: CertificateMetadata,
-  minGpa: string
+export async function generateRangeProof(
+  schema: Schema,
+  meta: CredentialMetadata,
+  claimKey: string,
+  thresholdRaw: number
 ): Promise<ZKProof> {
-  const gpaScaled = gpaToCircuitInput(metadata.gpa);
-  const minScaled = gpaToCircuitInput(minGpa);
-  if (!metadata.secret) {
-    throw new Error("Certificate metadata is missing its secret blinding factor");
+  const field = schema.claims.find((f) => f.key === claimKey);
+  if (!field) throw new Error(`Unknown claim "${claimKey}" for ${schema.label}`);
+  if (meta.salts?.[claimKey] === undefined) {
+    throw new Error("Credential metadata is missing claim salts (re-issue required)");
   }
+
+  const tree = buildClaimTree(claimInputs(schema, meta));
+  const leafIndex = tree.index[claimKey];
+  const path = merklePath(tree.layers, leafIndex);
 
   const input = {
-    gpa: gpaScaled,
-    secret: metadata.secret,
-    minGpa: minScaled,
+    value: scaleClaim(field, meta.claims[claimKey]),
+    salt: meta.salts[claimKey],
+    keyHash: keyHash(claimKey).toString(),
+    threshold: scaleClaim(field, thresholdRaw),
+    pathElements: path.pathElements.map((x) => x.toString()),
+    pathIndices: path.pathIndices,
   };
 
   const { proof, publicSignals } = await groth16.fullProve(
     input,
-    "/zk/certify.wasm",
-    "/zk/certify.zkey"
+    "/zk/range.wasm",
+    "/zk/range.zkey"
   );
 
   return {
@@ -118,10 +115,9 @@ export async function verifyProof(zkProof: ZKProof): Promise<boolean> {
 }
 
 /**
- * Format a proof for the Solidity Groth16 verifier.
- *
- * IMPORTANT: snarkjs' G2 point (`pi_b`) coordinate pairs must be reversed for
- * the on-chain verifier. This matches `snarkjs.groth16.exportSolidityCallData`.
+ * Format a proof for the Solidity Groth16 verifier (range, 3 public signals).
+ * snarkjs' G2 point (`pi_b`) coordinate pairs are reversed for the on-chain
+ * verifier — this matches `snarkjs.groth16.exportSolidityCallData`.
  */
 export function formatProofForSolidity(zkProof: ZKProof) {
   const { pi_a, pi_b, pi_c } = zkProof.proof;
@@ -132,6 +128,7 @@ export function formatProofForSolidity(zkProof: ZKProof) {
   ];
   const c: [bigint, bigint] = [BigInt(pi_c[0]), BigInt(pi_c[1])];
   const pubSignals = zkProof.publicSignals.map((x) => BigInt(x)) as [
+    bigint,
     bigint,
     bigint
   ];
@@ -152,8 +149,10 @@ export async function validateZkFiles(): Promise<{
     }
   };
   return {
-    wasm: await check("/zk/certify.wasm"),
-    zkey: await check("/zk/certify.zkey"),
+    wasm: await check("/zk/range.wasm"),
+    zkey: await check("/zk/range.zkey"),
     vkey: await check("/zk/verification_key.json"),
   };
 }
+
+export { MERKLE_DEPTH };

@@ -38,10 +38,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IGroth16Verifier__factory>;
     getContractFactory(
-      name: "IZKVerifier",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.IZKVerifier__factory>;
-    getContractFactory(
       name: "MockGroth16Verifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.MockGroth16Verifier__factory>;
@@ -49,14 +45,6 @@ declare module "hardhat/types/runtime" {
       name: "Groth16Verifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Groth16Verifier__factory>;
-    getContractFactory(
-      name: "IVerifier",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.IVerifier__factory>;
-    getContractFactory(
-      name: "ZKPCertify",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.ZKPCertify__factory>;
 
     getContractAt(
       name: "AccessControl",
@@ -89,11 +77,6 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.IGroth16Verifier>;
     getContractAt(
-      name: "IZKVerifier",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.IZKVerifier>;
-    getContractAt(
       name: "MockGroth16Verifier",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
@@ -103,16 +86,6 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.Groth16Verifier>;
-    getContractAt(
-      name: "IVerifier",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.IVerifier>;
-    getContractAt(
-      name: "ZKPCertify",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.ZKPCertify>;
 
     deployContract(
       name: "AccessControl",
@@ -139,10 +112,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IGroth16Verifier>;
     deployContract(
-      name: "IZKVerifier",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.IZKVerifier>;
-    deployContract(
       name: "MockGroth16Verifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.MockGroth16Verifier>;
@@ -150,14 +119,6 @@ declare module "hardhat/types/runtime" {
       name: "Groth16Verifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.Groth16Verifier>;
-    deployContract(
-      name: "IVerifier",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.IVerifier>;
-    deployContract(
-      name: "ZKPCertify",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.ZKPCertify>;
 
     deployContract(
       name: "AccessControl",
@@ -190,11 +151,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IGroth16Verifier>;
     deployContract(
-      name: "IZKVerifier",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.IZKVerifier>;
-    deployContract(
       name: "MockGroth16Verifier",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
@@ -204,16 +160,6 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.Groth16Verifier>;
-    deployContract(
-      name: "IVerifier",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.IVerifier>;
-    deployContract(
-      name: "ZKPCertify",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.ZKPCertify>;
 
     // default types
     getContractFactory(

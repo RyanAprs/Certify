@@ -3,4 +3,3 @@
 /* eslint-disable */
 export type { CertifyRegistry } from "./CertifyRegistry";
 export type { IGroth16Verifier } from "./IGroth16Verifier";
-export type { IZKVerifier } from "./IZKVerifier";

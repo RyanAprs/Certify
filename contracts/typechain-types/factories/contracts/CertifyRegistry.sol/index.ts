@@ -3,4 +3,3 @@
 /* eslint-disable */
 export { CertifyRegistry__factory } from "./CertifyRegistry__factory";
 export { IGroth16Verifier__factory } from "./IGroth16Verifier__factory";
-export { IZKVerifier__factory } from "./IZKVerifier__factory";

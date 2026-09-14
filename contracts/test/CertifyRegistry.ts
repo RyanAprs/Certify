@@ -8,6 +8,8 @@ const DUMMY_B: [[bigint, bigint], [bigint, bigint]] = [
   [3n, 4n],
 ];
 const DUMMY_C: [bigint, bigint] = [5n, 6n];
+const SCHEMA = ethers.id("diploma.v1"); // keccak256("diploma.v1")
+const KEY_HASH = 111n; // stand-in for keyHash("gpa") in these unit tests
 
 describe("CertifyRegistry", () => {
   async function deploy() {
@@ -36,7 +38,7 @@ describe("CertifyRegistry", () => {
     await registry.connect(admin).manageMember(holder.address, true);
     const tx = await registry
       .connect(admin)
-      .issueCertificate(holder.address, "cid", commitment);
+      .issueCertificate(holder.address, "cid", commitment, SCHEMA);
     await tx.wait();
   }
 
@@ -50,6 +52,7 @@ describe("CertifyRegistry", () => {
     const cert = await registry.certificates(ids[0]);
     expect(cert.holder).to.equal(holder.address);
     expect(cert.status).to.equal(1); // Active
+    expect(cert.schemaId).to.equal(SCHEMA);
   });
 
   it("rejects issuance for an unapproved holder", async () => {
@@ -58,8 +61,19 @@ describe("CertifyRegistry", () => {
     await expect(
       registry
         .connect(admin)
-        .issueCertificate(holder.address, "cid", ethers.zeroPadValue("0x01", 32))
+        .issueCertificate(holder.address, "cid", ethers.zeroPadValue("0x01", 32), SCHEMA)
     ).to.be.revertedWith("holder not approved");
+  });
+
+  it("requires a non-zero schema id", async () => {
+    const { admin, holder, registry } = await deploy();
+    await registry.connect(holder).requestMembership(admin.address);
+    await registry.connect(admin).manageMember(holder.address, true);
+    await expect(
+      registry
+        .connect(admin)
+        .issueCertificate(holder.address, "cid", ethers.zeroPadValue("0x12", 32), ethers.ZeroHash)
+    ).to.be.revertedWith("schema required");
   });
 
   it("only the issuer or admin can change status", async () => {
@@ -77,45 +91,45 @@ describe("CertifyRegistry", () => {
     expect(cert.status).to.equal(2);
   });
 
-  it("verifies a selective proof, binds the commitment, and blocks replay", async () => {
+  it("verifies a range proof, binds the root, and blocks replay", async () => {
     const { admin, holder, verifier, mock, registry } = await deploy();
     const commitment = ethers.zeroPadValue("0xabcd", 32);
     await issueTo(registry, admin, holder, commitment);
     const ids = await registry.getHolderCertificates(holder.address);
 
-    // pubSignals[0] must equal the certificate commitment.
-    const pub: [bigint, bigint] = [BigInt(commitment), 300n];
+    // pubSignals = [root, keyHash, threshold]; root must equal the commitment.
+    const pub: [bigint, bigint, bigint] = [BigInt(commitment), KEY_HASH, 300n];
 
-    // Commitment mismatch is rejected before touching the verifier.
+    // Root mismatch is rejected before touching the verifier.
     await expect(
       registry
         .connect(verifier)
-        .verifySelectiveProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, [1n, 300n])
+        .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, [1n, KEY_HASH, 300n])
     ).to.be.revertedWith("commitment mismatch");
 
-    // Happy path (mock returns true).
+    // Happy path (mock returns true) — emits keyHash + threshold.
     await expect(
       registry
         .connect(verifier)
-        .verifySelectiveProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
+        .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
     )
       .to.emit(registry, "ZKVerified")
-      .withArgs(ids[0], verifier.address, 300n);
+      .withArgs(ids[0], verifier.address, KEY_HASH, 300n);
 
     // Same proof cannot be replayed.
     await expect(
       registry
         .connect(verifier)
-        .verifySelectiveProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
+        .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
     ).to.be.revertedWith("proof already used");
 
     // A failing verifier is rejected.
     await mock.setResult(false);
-    const pub2: [bigint, bigint] = [BigInt(commitment), 350n];
+    const pub2: [bigint, bigint, bigint] = [BigInt(commitment), KEY_HASH, 350n];
     await expect(
       registry
         .connect(verifier)
-        .verifySelectiveProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub2)
+        .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub2)
     ).to.be.revertedWith("invalid proof");
   });
 

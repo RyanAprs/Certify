@@ -56,6 +56,12 @@
         "internalType": "address",
         "name": "holder",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "schemaId",
+        "type": "bytes32"
       }
     ],
     "name": "CertificateIssued",
@@ -273,7 +279,13 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "minGpa",
+        "name": "keyHash",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "threshold",
         "type": "uint256"
       }
     ],
@@ -350,6 +362,11 @@
         "internalType": "uint64",
         "name": "issuedAt",
         "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "schemaId",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -515,6 +532,11 @@
       {
         "internalType": "bytes32",
         "name": "metadataCommitment",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "schemaId",
         "type": "bytes32"
       }
     ],
@@ -769,12 +791,12 @@
         "type": "uint256[2]"
       },
       {
-        "internalType": "uint256[2]",
+        "internalType": "uint256[3]",
         "name": "pubSignals",
-        "type": "uint256[2]"
+        "type": "uint256[3]"
       }
     ],
-    "name": "verifySelectiveProof",
+    "name": "verifyRangeProof",
     "outputs": [
       {
         "internalType": "bool",

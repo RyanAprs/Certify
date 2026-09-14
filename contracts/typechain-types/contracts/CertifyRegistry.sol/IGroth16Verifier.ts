@@ -29,7 +29,7 @@ export interface IGroth16VerifierInterface extends Interface {
       [BigNumberish, BigNumberish],
       [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       [BigNumberish, BigNumberish],
-      [BigNumberish, BigNumberish]
+      [BigNumberish, BigNumberish, BigNumberish]
     ]
   ): string;
 
@@ -87,7 +87,7 @@ export interface IGroth16Verifier extends BaseContract {
       a: [BigNumberish, BigNumberish],
       b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       c: [BigNumberish, BigNumberish],
-      pubSignals: [BigNumberish, BigNumberish]
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
     ],
     [boolean],
     "view"
@@ -104,7 +104,7 @@ export interface IGroth16Verifier extends BaseContract {
       a: [BigNumberish, BigNumberish],
       b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       c: [BigNumberish, BigNumberish],
-      pubSignals: [BigNumberish, BigNumberish]
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
     ],
     [boolean],
     "view"

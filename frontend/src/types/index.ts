@@ -8,6 +8,7 @@ export interface Certificate {
   metadataCommitment: string;
   status: CertificateStatus;
   issuedAt: bigint;
+  schemaId: string;
 }
 
 export interface Disclosure {

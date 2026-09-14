@@ -29,7 +29,7 @@ export interface Groth16VerifierInterface extends Interface {
       [BigNumberish, BigNumberish],
       [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       [BigNumberish, BigNumberish],
-      [BigNumberish, BigNumberish]
+      [BigNumberish, BigNumberish, BigNumberish]
     ]
   ): string;
 
@@ -87,7 +87,7 @@ export interface Groth16Verifier extends BaseContract {
       arg0: [BigNumberish, BigNumberish],
       arg1: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       arg2: [BigNumberish, BigNumberish],
-      arg3: [BigNumberish, BigNumberish]
+      arg3: [BigNumberish, BigNumberish, BigNumberish]
     ],
     [boolean],
     "view"
@@ -104,7 +104,7 @@ export interface Groth16Verifier extends BaseContract {
       arg0: [BigNumberish, BigNumberish],
       arg1: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
       arg2: [BigNumberish, BigNumberish],
-      arg3: [BigNumberish, BigNumberish]
+      arg3: [BigNumberish, BigNumberish, BigNumberish]
     ],
     [boolean],
     "view"

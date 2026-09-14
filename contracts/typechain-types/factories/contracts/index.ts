@@ -2,6 +2,5 @@
 /* tslint:disable */
 /* eslint-disable */
 export * as certifyRegistrySol from "./CertifyRegistry.sol";
-export * as zkpCertifySol from "./ZKPCertify.sol";
 export * as mocks from "./mocks";
 export * as verifierSol from "./verifier.sol";

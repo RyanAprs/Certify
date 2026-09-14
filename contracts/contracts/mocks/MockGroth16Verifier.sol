@@ -19,7 +19,7 @@ contract MockGroth16Verifier {
         uint[2] calldata,
         uint[2][2] calldata,
         uint[2] calldata,
-        uint[2] calldata
+        uint[3] calldata
     ) external view returns (bool) {
         return result;
     }

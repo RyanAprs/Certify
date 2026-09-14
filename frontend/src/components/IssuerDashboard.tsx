@@ -5,6 +5,7 @@ import { isAddress, parseAbiItem } from "viem";
 import toast from "react-hot-toast";
 import { useState } from "react";
 import { Stamp, UserCheck, UserX, Users, Inbox, FileText } from "lucide-react";
+import clsx from "clsx";
 
 import { useIssuerCertificates } from "../hooks/useCertificates";
 import { useRegistryWrite } from "../hooks/useRegistryWrite";
@@ -20,21 +21,15 @@ import {
 } from "./Shared";
 import { uploadFile, uploadJson } from "../lib/ipfs";
 import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
-import {
-  CertificateMetadata,
-  commitmentFromMetadata,
-  generateSecret,
-} from "../lib/zkp";
+import { SCHEMAS, Schema } from "../lib/schemas";
+import { CredentialMetadata, buildCommitment } from "../lib/zkp";
 
-interface IssueForm {
+type IssueForm = {
   holder: string;
-  name: string;
-  institution: string;
-  program: string;
-  gpa: string;
-  description: string;
+  display: Record<string, string>;
+  claims: Record<string, string>;
   image: FileList;
-}
+};
 
 function useMemberRequests(issuer?: `0x${string}`) {
   return useQuery({
@@ -87,19 +82,11 @@ export const IssuerDashboard = () => {
   const { write } = useRegistryWrite();
   const { refreshRole } = useRole();
 
+  const [schema, setSchema] = useState<Schema>(SCHEMAS[0]);
   const [processing, setProcessing] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
 
-  const form = useForm<IssueForm>({
-    defaultValues: {
-      holder: "",
-      name: "",
-      institution: "",
-      program: "",
-      gpa: "",
-      description: "",
-    },
-  });
+  const form = useForm<IssueForm>({ defaultValues: { holder: "", display: {}, claims: {} } });
   const { errors } = form.formState;
 
   const onDecision = async (holder: string, approve: boolean) => {
@@ -123,33 +110,38 @@ export const IssuerDashboard = () => {
       const file = values.image?.item(0);
       if (!file) throw new Error("Certificate image is required");
 
+      const rawClaims: Record<string, number> = {};
+      for (const f of schema.claims) rawClaims[f.key] = parseFloat(values.claims[f.key]);
+
+      // Merkle root of the claims — computed here so it matches the circuit.
+      const { rootHex, salts } = buildCommitment(schema, rawClaims);
+
       const imageCid = await toast.promise(uploadFile(file), {
         loading: "Uploading image to IPFS…",
         success: "Image uploaded",
         error: "Image upload failed",
       });
 
-      const secret = generateSecret();
-      const metadata: CertificateMetadata = {
-        name: values.name,
-        institution: values.institution,
-        program: values.program,
-        gpa: values.gpa,
-        description: values.description,
+      const metadata: CredentialMetadata = {
+        schemaId: schema.id,
+        type: schema.type,
+        name: values.display.name ?? "",
+        institution: values.display.institution ?? "",
+        program: values.display.program ?? "",
+        description: values.display.description ?? "",
         imageCid,
         issuedAt: new Date().toISOString(),
-        secret,
+        claims: rawClaims,
+        salts,
       };
 
       const metadataCid = await uploadJson(metadata);
-      const metadataCommitment = commitmentFromMetadata(metadata);
-
       await write(
         "issueCertificate",
-        [values.holder as `0x${string}`, metadataCid, metadataCommitment],
+        [values.holder as `0x${string}`, metadataCid, rootHex, schema.id],
         { pending: "Issuing certificate…", success: "Certificate issued" }
       );
-      form.reset();
+      form.reset({ holder: "", display: {}, claims: {} });
     } catch (err: any) {
       if (err?.message) toast.error(err.message);
     } finally {
@@ -163,7 +155,7 @@ export const IssuerDashboard = () => {
         icon={<Stamp size={22} aria-hidden="true" />}
         eyebrow="Workspace"
         title="Issuer"
-        description="Issue academic credentials and manage which holders can receive them."
+        description="Issue academic and competency credentials, and manage which holders can receive them."
         aside={address ? <DataChip label="signed in" value={address} /> : undefined}
       />
 
@@ -172,7 +164,33 @@ export const IssuerDashboard = () => {
         <form onSubmit={onIssue} className="panel-pad space-y-4">
           <div className="flex items-center gap-2">
             <FileText size={17} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-ink">Issue a certificate</h2>
+            <h2 className="font-semibold text-ink">Issue a credential</h2>
+          </div>
+
+          {/* Credential type */}
+          <div>
+            <span className="label">Credential type</span>
+            <div className="grid grid-cols-2 gap-2">
+              {SCHEMAS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setSchema(s);
+                    form.resetField("claims");
+                  }}
+                  className={clsx(
+                    "rounded-md border px-3 py-2 text-left text-sm transition",
+                    s.id === schema.id
+                      ? "border-primary bg-primary-tint text-ink"
+                      : "border-line-strong bg-surface text-ink-muted hover:border-primary/40"
+                  )}
+                >
+                  <span className="block font-semibold">{s.label}</span>
+                  <span className="block text-xs text-ink-subtle">{s.type}.{s.version}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <Field label="Holder address" error={errors.holder?.message}>
@@ -188,46 +206,81 @@ export const IssuerDashboard = () => {
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Full name" error={errors.name?.message}>
-              <input className="input" placeholder="Ada Lovelace" disabled={isIssuing}
-                {...form.register("name", { required: "Name is required" })} />
-            </Field>
-            <Field label="GPA" hint="0–5 scale" error={errors.gpa?.message}>
-              <input className="input" type="number" step="0.01" min="0" max="5"
-                placeholder="3.85" disabled={isIssuing}
-                {...form.register("gpa", {
-                  required: "GPA is required",
-                  validate: (v) => {
-                    const n = parseFloat(v);
-                    return (!isNaN(n) && n >= 0 && n <= 5) || "Must be between 0 and 5";
-                  },
-                })} />
-            </Field>
-            <Field label="Institution">
-              <input className="input" placeholder="University of…" disabled={isIssuing}
-                {...form.register("institution", { required: true })} />
-            </Field>
-            <Field label="Program">
-              <input className="input" placeholder="B.Sc. Computer Science" disabled={isIssuing}
-                {...form.register("program", { required: true })} />
-            </Field>
+            {schema.display.map((f) => (
+              <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
+                <Field label={f.label}>
+                  {f.type === "textarea" ? (
+                    <textarea
+                      className="input min-h-[80px] resize-y"
+                      placeholder={f.placeholder}
+                      disabled={isIssuing}
+                      {...form.register(`display.${f.key}` as const, { required: f.required })}
+                    />
+                  ) : (
+                    <input
+                      className="input"
+                      placeholder={f.placeholder}
+                      disabled={isIssuing}
+                      {...form.register(`display.${f.key}` as const, { required: f.required })}
+                    />
+                  )}
+                </Field>
+              </div>
+            ))}
           </div>
 
-          <Field label="Description">
-            <textarea className="input min-h-[80px] resize-y" disabled={isIssuing}
-              placeholder="Awarded with honours…"
-              {...form.register("description", { required: true })} />
-          </Field>
+          {/* Provable claims (private) */}
+          <div className="rounded-lg border border-line bg-sunken/40 p-4">
+            <p className="mb-3 text-sm font-medium text-ink">
+              Private claims{" "}
+              <span className="font-normal text-ink-subtle">
+                — committed on-chain, provable by threshold, never revealed
+              </span>
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {schema.claims.map((f) => (
+                <Field
+                  key={f.key}
+                  label={`${f.label}${f.unit ? ` (${f.unit})` : ""}`}
+                  hint={`${f.min}–${f.max}`}
+                  error={(errors.claims as any)?.[f.key]?.message}
+                >
+                  <input
+                    className="input"
+                    type="number"
+                    min={f.min}
+                    max={f.max}
+                    step={f.step ?? "any"}
+                    disabled={isIssuing}
+                    {...form.register(`claims.${f.key}` as const, {
+                      required: `${f.label} is required`,
+                      validate: (v) => {
+                        const n = parseFloat(v);
+                        return (
+                          (!isNaN(n) && n >= f.min && n <= f.max) ||
+                          `Must be between ${f.min} and ${f.max}`
+                        );
+                      },
+                    })}
+                  />
+                </Field>
+              ))}
+            </div>
+          </div>
 
           <Field label="Certificate image" hint="PNG or JPEG, stored on IPFS">
-            <input className="input file:mr-3 file:rounded file:border-0 file:bg-sunken file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
-              type="file" accept="image/*" disabled={isIssuing}
-              {...form.register("image", { required: true })} />
+            <input
+              className="input file:mr-3 file:rounded file:border-0 file:bg-sunken file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
+              type="file"
+              accept="image/*"
+              disabled={isIssuing}
+              {...form.register("image", { required: true })}
+            />
           </Field>
 
           <button className="btn-primary w-full" disabled={isIssuing}>
             <Stamp size={16} aria-hidden="true" />
-            {isIssuing ? "Issuing…" : "Issue certificate"}
+            {isIssuing ? "Issuing…" : `Issue ${schema.label.toLowerCase()}`}
           </button>
         </form>
 
@@ -314,7 +367,7 @@ export const IssuerDashboard = () => {
       {/* Issued certificates */}
       <div className="mt-10">
         <h2 className="mb-4 font-serif text-xl font-semibold text-ink">
-          Issued certificates
+          Issued credentials
         </h2>
         {certsLoading ? (
           <div className="grid gap-5 md:grid-cols-2">
@@ -328,7 +381,7 @@ export const IssuerDashboard = () => {
             ))}
           </div>
         ) : (
-          <EmptyState icon={<FileText size={28} />} title="No certificates issued yet">
+          <EmptyState icon={<FileText size={28} />} title="No credentials issued yet">
             Approve a holder above, then issue their first credential. It will be
             recorded on-chain with a zero-knowledge commitment.
           </EmptyState>

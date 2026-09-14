@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Build the Certify ZK circuit end-to-end and publish artifacts to the
+# Build the Certify range circuit end-to-end and publish artifacts to the
 # frontend (proving) and the contracts package (on-chain verifier).
 #
 # Requirements (install once):
 #   - circom v2  ->  https://docs.circom.io/getting-started/installation/
-#   - snarkjs    ->  npm i -g snarkjs   (or use npx)
+#   - snarkjs    ->  invoked via npx
 #
 # Usage:
-#   cd zk && ./build.sh
+#   cd zk && npm install && ./build.sh
 #
 # It is deterministic apart from the dev trusted-setup contribution entropy,
 # which is fine for local/testnet. DO NOT use these keys for mainnet — run a
@@ -18,9 +18,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-CIRCUIT=certify
+CIRCUIT=range
 CIRCUIT_SRC="circuits/${CIRCUIT}.circom"
-PTAU="circuits/powersOfTau28_hez_final_10.ptau"
+# The Merkle inclusion path pushes the constraint count well past 2^10, so a
+# larger powers-of-tau is required. Power 14 (16k constraints) is comfortable.
+PTAU="circuits/powersOfTau28_hez_final_14.ptau"
 BUILD_DIR="build"
 FRONTEND_ZK="../frontend/public/zk"
 CONTRACTS_DIR="../contracts/contracts"
@@ -28,11 +30,17 @@ CONTRACTS_DIR="../contracts/contracts"
 command -v circom >/dev/null 2>&1 || { echo "❌ circom not found. Install circom v2 first."; exit 1; }
 SNARKJS="npx --yes snarkjs"
 
-[ -f "$PTAU" ] || { echo "❌ Missing $PTAU (powers of tau). Download a Hermez ptau of power >= 12."; exit 1; }
+if [ ! -f "$PTAU" ]; then
+  echo "❌ Missing $PTAU"
+  echo "   Download a Hermez powers-of-tau of power >= 14, e.g.:"
+  echo "   curl -L -o $PTAU https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_14.ptau"
+  exit 1
+fi
 
-echo "==> 1/6 Compiling circuit"
+echo "==> 1/6 Compiling circuit ($CIRCUIT)"
 mkdir -p "$BUILD_DIR"
 circom "$CIRCUIT_SRC" --r1cs --wasm --sym -l node_modules -o "$BUILD_DIR"
+$SNARKJS r1cs info "$BUILD_DIR/${CIRCUIT}.r1cs"
 
 echo "==> 2/6 Groth16 setup"
 $SNARKJS groth16 setup "$BUILD_DIR/${CIRCUIT}.r1cs" "$PTAU" "$BUILD_DIR/${CIRCUIT}_0000.zkey"
@@ -52,14 +60,14 @@ cp "$BUILD_DIR/verifier.sol" "$CONTRACTS_DIR/verifier.sol"
 echo "==> 6/6 Publishing proving artifacts to frontend"
 mkdir -p "$FRONTEND_ZK"
 cp "$BUILD_DIR/${CIRCUIT}_js/${CIRCUIT}.wasm" "$FRONTEND_ZK/${CIRCUIT}.wasm"
-cp "$BUILD_DIR/${CIRCUIT}_final.zkey"        "$FRONTEND_ZK/${CIRCUIT}.zkey"
-cp "$BUILD_DIR/verification_key.json"        "$FRONTEND_ZK/verification_key.json"
+cp "$BUILD_DIR/${CIRCUIT}_final.zkey"         "$FRONTEND_ZK/${CIRCUIT}.zkey"
+cp "$BUILD_DIR/verification_key.json"         "$FRONTEND_ZK/verification_key.json"
 
 echo ""
 echo "✅ Done."
-echo "   frontend/public/zk/certify.wasm"
-echo "   frontend/public/zk/certify.zkey"
+echo "   frontend/public/zk/range.wasm"
+echo "   frontend/public/zk/range.zkey"
 echo "   frontend/public/zk/verification_key.json"
 echo "   contracts/contracts/verifier.sol   (Groth16Verifier — deploy this)"
 echo ""
-echo "Public signal layout: [0]=commitment, [1]=minGpa"
+echo "Public signal layout: [0]=root, [1]=keyHash, [2]=threshold"

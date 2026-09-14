@@ -18,13 +18,7 @@ export type { CertifyRegistry } from "./contracts/CertifyRegistry.sol/CertifyReg
 export { CertifyRegistry__factory } from "./factories/contracts/CertifyRegistry.sol/CertifyRegistry__factory";
 export type { IGroth16Verifier } from "./contracts/CertifyRegistry.sol/IGroth16Verifier";
 export { IGroth16Verifier__factory } from "./factories/contracts/CertifyRegistry.sol/IGroth16Verifier__factory";
-export type { IZKVerifier } from "./contracts/CertifyRegistry.sol/IZKVerifier";
-export { IZKVerifier__factory } from "./factories/contracts/CertifyRegistry.sol/IZKVerifier__factory";
 export type { MockGroth16Verifier } from "./contracts/mocks/MockGroth16Verifier";
 export { MockGroth16Verifier__factory } from "./factories/contracts/mocks/MockGroth16Verifier__factory";
 export type { Groth16Verifier } from "./contracts/verifier.sol/Groth16Verifier";
 export { Groth16Verifier__factory } from "./factories/contracts/verifier.sol/Groth16Verifier__factory";
-export type { IVerifier } from "./contracts/ZKPCertify.sol/IVerifier";
-export { IVerifier__factory } from "./factories/contracts/ZKPCertify.sol/IVerifier__factory";
-export type { ZKPCertify } from "./contracts/ZKPCertify.sol/ZKPCertify";
-export { ZKPCertify__factory } from "./factories/contracts/ZKPCertify.sol/ZKPCertify__factory";

@@ -1,28 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import toast from "react-hot-toast";
+import clsx from "clsx";
 import { Search, ShieldCheck, Cpu, FileCheck, History, CircleCheck } from "lucide-react";
 
 import { useDisclosures } from "../hooks/useCertificates";
 import { useRegistryWrite } from "../hooks/useRegistryWrite";
 import { publicClient, registryContract } from "../lib/contract";
 import { fetchFromIpfs, ipfsUrl } from "../lib/ipfs";
-import {
-  DataChip,
-  EmptyState,
-  Field,
-  Notice,
-  PageHeader,
-  Spinner,
-  StatusBadge,
-} from "./Shared";
+import { DataChip, EmptyState, Field, Notice, PageHeader, Spinner, StatusBadge } from "./Shared";
 import { CertificateStatus } from "../types";
+import { getSchema, Schema } from "../lib/schemas";
 import {
-  generateGpaProof,
+  generateRangeProof,
   verifyProof,
   formatProofForSolidity,
   validateZkFiles,
-  CertificateMetadata,
+  CredentialMetadata,
   ZKProof,
 } from "../lib/zkp";
 
@@ -33,6 +27,7 @@ interface Cert {
   metadataCid: string;
   metadataCommitment: `0x${string}`;
   status: CertificateStatus;
+  schemaId: string;
 }
 
 function toStatus(n: number): CertificateStatus {
@@ -45,15 +40,22 @@ export const VerifierDashboard = () => {
 
   const [certificateId, setCertificateId] = useState("");
   const [cert, setCert] = useState<Cert | null>(null);
-  const [metadata, setMetadata] = useState<CertificateMetadata | null>(null);
+  const [metadata, setMetadata] = useState<CredentialMetadata | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  const [minGpa, setMinGpa] = useState("3.00");
+  const [claimKey, setClaimKey] = useState<string>("");
+  const [threshold, setThreshold] = useState("");
   const [zkProof, setZkProof] = useState<ZKProof | null>(null);
   const [localVerified, setLocalVerified] = useState<boolean | null>(null);
   const [zkLoading, setZkLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [zkFilesOk, setZkFilesOk] = useState<boolean | null>(null);
+
+  const schema: Schema | undefined = useMemo(
+    () => (cert ? getSchema(cert.schemaId) : undefined),
+    [cert]
+  );
+  const claimField = schema?.claims.find((f) => f.key === claimKey);
 
   const { data: disclosures } = useDisclosures(
     certificateId ? BigInt(certificateId) : undefined
@@ -75,7 +77,7 @@ export const VerifierDashboard = () => {
         ...registryContract,
         functionName: "certificates",
         args: [BigInt(certificateId)],
-      })) as readonly [bigint, string, string, string, `0x${string}`, number, bigint];
+      })) as readonly [bigint, string, string, string, `0x${string}`, number, bigint, `0x${string}`];
       if (data[1] === "0x0000000000000000000000000000000000000000") {
         throw new Error("Certificate not found");
       }
@@ -86,11 +88,15 @@ export const VerifierDashboard = () => {
         metadataCid: data[3],
         metadataCommitment: data[4],
         status: toStatus(Number(data[5])),
+        schemaId: data[7],
       };
       setCert(found);
+      const sc = getSchema(found.schemaId);
+      setClaimKey(sc?.claims[0]?.key ?? "");
+      setThreshold("");
       if (found.metadataCid) {
         try {
-          setMetadata(await fetchFromIpfs<CertificateMetadata>(found.metadataCid));
+          setMetadata(await fetchFromIpfs<CredentialMetadata>(found.metadataCid));
         } catch {
           toast.error("Failed to load metadata from IPFS");
         }
@@ -103,16 +109,16 @@ export const VerifierDashboard = () => {
   };
 
   const onGenerateProof = async () => {
-    if (!metadata) return toast.error("Load a certificate first");
-    if (!metadata.secret) {
-      return toast.error(
-        "This certificate has no ZK secret (issued before the ZK upgrade)."
-      );
+    if (!metadata || !schema || !claimField) return toast.error("Load a certificate first");
+    if (!metadata.salts) {
+      return toast.error("This credential has no ZK salts (issued before the ZK upgrade).");
     }
+    const t = parseFloat(threshold);
+    if (isNaN(t)) return toast.error("Enter a threshold");
     setZkLoading(true);
     setLocalVerified(null);
     try {
-      const proof = await generateGpaProof(metadata, minGpa);
+      const proof = await generateRangeProof(schema, metadata, claimKey, t);
       setZkProof(proof);
       setLocalVerified(await verifyProof(proof));
       toast.success("Proof generated & self-verified");
@@ -128,7 +134,7 @@ export const VerifierDashboard = () => {
     setIsVerifying(true);
     try {
       const { a, b, c, pubSignals } = formatProofForSolidity(zkProof);
-      await write("verifySelectiveProof", [cert.id, a, b, c, pubSignals], {
+      await write("verifyRangeProof", [cert.id, a, b, c, pubSignals], {
         pending: "Verifying proof on-chain…",
         success: "Proof verified on-chain",
       });
@@ -145,13 +151,13 @@ export const VerifierDashboard = () => {
         icon={<ShieldCheck size={22} aria-hidden="true" />}
         eyebrow="Workspace"
         title="Verifier"
-        description="Look up a credential and verify a GPA threshold on-chain — without seeing the GPA."
+        description="Look up a credential and verify a threshold on-chain — without seeing the underlying value."
       />
 
       {zkFilesOk === false && (
         <div className="mb-6">
           <Notice tone="warning" title="ZK artifacts not built">
-            <code>certify.wasm</code> / <code>certify.zkey</code> are missing from{" "}
+            <code>range.wasm</code> / <code>range.zkey</code> are missing from{" "}
             <code>public/zk/</code>. Run <code>cd zk &amp;&amp; ./build.sh</code>{" "}
             before generating proofs.
           </Notice>
@@ -162,7 +168,7 @@ export const VerifierDashboard = () => {
       <div className="panel-pad">
         <div className="mb-4 flex items-center gap-2">
           <Search size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-semibold text-ink">Find a certificate</h2>
+          <h2 className="font-semibold text-ink">Find a credential</h2>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
@@ -184,9 +190,12 @@ export const VerifierDashboard = () => {
               <div className="min-w-0">
                 {metadata ? (
                   <>
-                    <h3 className="font-serif text-xl font-semibold text-ink">
-                      {metadata.name}
-                    </h3>
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="badge border-primary/25 bg-primary-tint text-primary">
+                        {schema?.label ?? "Unknown type"}
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-xl font-semibold text-ink">{metadata.name}</h3>
                     <p className="text-sm text-ink-muted">
                       {metadata.program} · {metadata.institution}
                     </p>
@@ -208,24 +217,59 @@ export const VerifierDashboard = () => {
         )}
       </div>
 
-      {/* Proof */}
-      {metadata && (
+      {/* Presentation request */}
+      {metadata && schema && (
         <div className="panel-pad mt-6 space-y-5">
           <div className="flex items-center gap-2">
             <Cpu size={17} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-ink">Prove a GPA threshold</h2>
+            <h2 className="font-semibold text-ink">Request a proof</h2>
           </div>
 
+          {schema.claims.length > 1 && (
+            <div>
+              <span className="label">Claim to prove</span>
+              <div className="flex flex-wrap gap-2">
+                {schema.claims.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => {
+                      setClaimKey(f.key);
+                      setThreshold("");
+                      setZkProof(null);
+                    }}
+                    className={clsx(
+                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
+                      f.key === claimKey
+                        ? "border-primary bg-primary-tint text-ink"
+                        : "border-line-strong text-ink-muted hover:border-primary/40"
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Field label="Minimum GPA to prove" hint={`Proves GPA ≥ ${minGpa} without revealing it`}>
+            <Field
+              label={`Minimum ${claimField?.label ?? "value"} to prove`}
+              hint={
+                claimField
+                  ? `Proves ${claimField.label} ≥ threshold (range ${claimField.min}–${claimField.max}), value stays hidden`
+                  : undefined
+              }
+            >
               <input
                 className="input"
                 type="number"
-                step="0.01"
-                min="0"
-                max="5"
-                value={minGpa}
-                onChange={(e) => setMinGpa(e.target.value)}
+                min={claimField?.min}
+                max={claimField?.max}
+                step={claimField?.step ?? "any"}
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                placeholder={claimField ? String(claimField.min) : ""}
               />
             </Field>
             <button
@@ -273,9 +317,7 @@ export const VerifierDashboard = () => {
       <div className="mt-10">
         <div className="mb-4 flex items-center gap-2">
           <History size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-serif text-xl font-semibold text-ink">
-            Disclosure history
-          </h2>
+          <h2 className="font-serif text-xl font-semibold text-ink">Disclosure history</h2>
         </div>
         {disclosures && disclosures.length > 0 ? (
           <ul className="space-y-3">

@@ -21,10 +21,19 @@ async function fetchCertificatesByIds(ids: bigint[]): Promise<Certificate[]> {
         string,
         `0x${string}`,
         number,
-        bigint
+        bigint,
+        `0x${string}`
       ];
-      const [certId, issuer, holder, metadataCid, metadataCommitment, statusEnum, issuedAt] =
-        data;
+      const [
+        certId,
+        issuer,
+        holder,
+        metadataCid,
+        metadataCommitment,
+        statusEnum,
+        issuedAt,
+        schemaId,
+      ] = data;
       return {
         id: certId,
         issuer,
@@ -33,6 +42,7 @@ async function fetchCertificatesByIds(ids: bigint[]): Promise<Certificate[]> {
         metadataCommitment,
         status: toStatus(Number(statusEnum)),
         issuedAt,
+        schemaId,
       } satisfies Certificate;
     })
   );
