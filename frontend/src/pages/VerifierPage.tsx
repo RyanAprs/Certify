@@ -1,8 +1,8 @@
 import { VerifierDashboard } from "../components/VerifierDashboard";
-import { AuthGuard } from "../components/AuthGuard";
+import { RoleGuard } from "../components/RoleGuard";
 
 export const VerifierPage = () => (
-  <AuthGuard>
+  <RoleGuard role="verifier">
     <VerifierDashboard />
-  </AuthGuard>
+  </RoleGuard>
 );

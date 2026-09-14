@@ -1,8 +1,8 @@
 import { HolderDashboard } from "../components/HolderDashboard";
-import { AuthGuard } from "../components/AuthGuard";
+import { RoleGuard } from "../components/RoleGuard";
 
 export const HolderPage = () => (
-  <AuthGuard>
+  <RoleGuard role="holder">
     <HolderDashboard />
-  </AuthGuard>
+  </RoleGuard>
 );
