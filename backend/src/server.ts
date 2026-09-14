@@ -9,10 +9,26 @@ config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const IS_PROD = process.env.NODE_ENV === "production";
 
+// Expected SIWE domain (host[:port]) derived from the configured frontend URL.
+const EXPECTED_DOMAIN = (() => {
+  try {
+    return new URL(FRONTEND_URL).host;
+  } catch {
+    return undefined;
+  }
+})();
+
+const NONCE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Restrict CORS to the known frontend origin (reflecting any origin with
+// credentials enabled is a security hole).
 app.use(
   cors({
-    origin: true,
+    origin: FRONTEND_URL,
     credentials: true,
   })
 );
@@ -24,8 +40,20 @@ interface Session {
   createdAt: number;
 }
 
-const nonceStore = new Set<string>();
+const nonceStore = new Map<string, number>(); // nonce -> issuedAt
 const sessionStore = new Map<string, Session>();
+
+// Periodically evict expired nonces and sessions so the maps do not grow
+// unbounded (the previous Set/Map never expired anything).
+setInterval(() => {
+  const now = Date.now();
+  for (const [nonce, issuedAt] of nonceStore) {
+    if (now - issuedAt > NONCE_TTL_MS) nonceStore.delete(nonce);
+  }
+  for (const [id, session] of sessionStore) {
+    if (now - session.createdAt > SESSION_TTL_MS) sessionStore.delete(id);
+  }
+}, 60 * 1000).unref();
 
 function createSession(address: string) {
   const sessionId = crypto.randomUUID();
@@ -37,19 +65,24 @@ function getSession(req: express.Request) {
   const token = req.cookies["certify_session"];
   if (!token) return null;
   const session = sessionStore.get(token);
-  return session ?? null;
+  if (!session) return null;
+  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+    sessionStore.delete(token);
+    return null;
+  }
+  return session;
 }
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 app.get("/api/auth/nonce", (_req, res) => {
   const nonce = crypto.randomBytes(16).toString("hex");
-  nonceStore.add(nonce);
+  nonceStore.set(nonce, Date.now());
   res.json({ nonce });
 });
 
 app.post("/api/auth/verify", async (req, res) => {
-  const { message, signature } = req.body;
+  const { message, signature } = req.body ?? {};
 
   if (!message || !signature) {
     return res.status(400).json({ error: "Missing message or signature" });
@@ -58,31 +91,38 @@ app.post("/api/auth/verify", async (req, res) => {
   try {
     const siweMessage = new SiweMessage(message);
 
-    // Verify signature
-    const { data } = await siweMessage.verify({
-      signature,
-      time: new Date().toISOString(),
-    });
-
-    // Check and remove nonce
-    if (!nonceStore.has(siweMessage.nonce)) {
+    // Nonce must exist and be unexpired; consume it up-front to prevent replay.
+    const issuedAt = nonceStore.get(siweMessage.nonce);
+    if (issuedAt === undefined || Date.now() - issuedAt > NONCE_TTL_MS) {
+      nonceStore.delete(siweMessage.nonce);
       return res.status(401).json({ error: "Invalid or expired nonce" });
     }
     nonceStore.delete(siweMessage.nonce);
 
-    // Create session
+    // Bind the signed message to our own domain and nonce.
+    const { data, success } = await siweMessage.verify({
+      signature,
+      nonce: siweMessage.nonce,
+      domain: EXPECTED_DOMAIN,
+      time: new Date().toISOString(),
+    });
+
+    if (!success) {
+      return res.status(401).json({ error: "Signature verification failed" });
+    }
+
     const sessionId = createSession(data.address);
     res.cookie("certify_session", sessionId, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      secure: IS_PROD,
+      maxAge: SESSION_TTL_MS,
     });
 
     res.json({ address: data.address });
   } catch (error: any) {
-    console.error("Verification error:", error);
-    res.status(401).json({ error: error?.message ?? "Invalid signature" });
+    console.error("Verification error:", error?.message ?? error);
+    res.status(401).json({ error: "Invalid signature" });
   }
 });
 
@@ -103,4 +143,7 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Certify backend listening on port ${PORT}`);
+  if (!EXPECTED_DOMAIN) {
+    console.warn("⚠️  Could not derive SIWE domain from FRONTEND_URL:", FRONTEND_URL);
+  }
 });

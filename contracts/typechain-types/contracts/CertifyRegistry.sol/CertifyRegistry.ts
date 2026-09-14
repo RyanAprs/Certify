@@ -70,6 +70,7 @@ export interface CertifyRegistryInterface extends Interface {
       | "setCertificateStatus"
       | "shareCertificate"
       | "supportsInterface"
+      | "usedProofs"
       | "verifySelectiveProof"
       | "zkVerifier"
   ): FunctionFragment;
@@ -169,8 +170,18 @@ export interface CertifyRegistryInterface extends Interface {
     values: [BytesLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "usedProofs",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "verifySelectiveProof",
-    values: [BigNumberish, BytesLike, BytesLike]
+    values: [
+      BigNumberish,
+      [BigNumberish, BigNumberish],
+      [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      [BigNumberish, BigNumberish],
+      [BigNumberish, BigNumberish]
+    ]
   ): string;
   encodeFunctionData(
     functionFragment: "zkVerifier",
@@ -248,6 +259,7 @@ export interface CertifyRegistryInterface extends Interface {
     functionFragment: "supportsInterface",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "usedProofs", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "verifySelectiveProof",
     data: BytesLike
@@ -424,17 +436,17 @@ export namespace ZKVerifiedEvent {
   export type InputTuple = [
     certificateId: BigNumberish,
     verifier: AddressLike,
-    queryHash: BytesLike
+    minGpa: BigNumberish
   ];
   export type OutputTuple = [
     certificateId: bigint,
     verifier: string,
-    queryHash: string
+    minGpa: bigint
   ];
   export interface OutputObject {
     certificateId: bigint;
     verifier: string;
-    queryHash: string;
+    minGpa: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -614,8 +626,16 @@ export interface CertifyRegistry extends BaseContract {
     "view"
   >;
 
+  usedProofs: TypedContractMethod<[proofHash: BytesLike], [boolean], "view">;
+
   verifySelectiveProof: TypedContractMethod<
-    [certificateId: BigNumberish, proof: BytesLike, queryHash: BytesLike],
+    [
+      certificateId: BigNumberish,
+      a: [BigNumberish, BigNumberish],
+      b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      c: [BigNumberish, BigNumberish],
+      pubSignals: [BigNumberish, BigNumberish]
+    ],
     [boolean],
     "nonpayable"
   >;
@@ -752,9 +772,18 @@ export interface CertifyRegistry extends BaseContract {
     nameOrSignature: "supportsInterface"
   ): TypedContractMethod<[interfaceId: BytesLike], [boolean], "view">;
   getFunction(
+    nameOrSignature: "usedProofs"
+  ): TypedContractMethod<[proofHash: BytesLike], [boolean], "view">;
+  getFunction(
     nameOrSignature: "verifySelectiveProof"
   ): TypedContractMethod<
-    [certificateId: BigNumberish, proof: BytesLike, queryHash: BytesLike],
+    [
+      certificateId: BigNumberish,
+      a: [BigNumberish, BigNumberish],
+      b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      c: [BigNumberish, BigNumberish],
+      pubSignals: [BigNumberish, BigNumberish]
+    ],
     [boolean],
     "nonpayable"
   >;
@@ -933,7 +962,7 @@ export interface CertifyRegistry extends BaseContract {
       RoleRevokedEvent.OutputObject
     >;
 
-    "ZKVerified(uint256,address,bytes32)": TypedContractEvent<
+    "ZKVerified(uint256,address,uint256)": TypedContractEvent<
       ZKVerifiedEvent.InputTuple,
       ZKVerifiedEvent.OutputTuple,
       ZKVerifiedEvent.OutputObject

@@ -5,5 +5,7 @@ import type * as certifyRegistrySol from "./CertifyRegistry.sol";
 export type { certifyRegistrySol };
 import type * as zkpCertifySol from "./ZKPCertify.sol";
 export type { zkpCertifySol };
+import type * as mocks from "./mocks";
+export type { mocks };
 import type * as verifierSol from "./verifier.sol";
 export type { verifierSol };

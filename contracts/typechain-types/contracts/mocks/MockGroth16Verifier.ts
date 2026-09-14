@@ -20,9 +20,13 @@ import type {
   TypedContractMethod,
 } from "../../common";
 
-export interface Groth16VerifierInterface extends Interface {
-  getFunction(nameOrSignature: "verifyProof"): FunctionFragment;
+export interface MockGroth16VerifierInterface extends Interface {
+  getFunction(
+    nameOrSignature: "result" | "setResult" | "verifyProof"
+  ): FunctionFragment;
 
+  encodeFunctionData(functionFragment: "result", values?: undefined): string;
+  encodeFunctionData(functionFragment: "setResult", values: [boolean]): string;
   encodeFunctionData(
     functionFragment: "verifyProof",
     values: [
@@ -33,17 +37,19 @@ export interface Groth16VerifierInterface extends Interface {
     ]
   ): string;
 
+  decodeFunctionResult(functionFragment: "result", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "setResult", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "verifyProof",
     data: BytesLike
   ): Result;
 }
 
-export interface Groth16Verifier extends BaseContract {
-  connect(runner?: ContractRunner | null): Groth16Verifier;
+export interface MockGroth16Verifier extends BaseContract {
+  connect(runner?: ContractRunner | null): MockGroth16Verifier;
   waitForDeployment(): Promise<this>;
 
-  interface: Groth16VerifierInterface;
+  interface: MockGroth16VerifierInterface;
 
   queryFilter<TCEvent extends TypedContractEvent>(
     event: TCEvent,
@@ -82,6 +88,10 @@ export interface Groth16Verifier extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
+  result: TypedContractMethod<[], [boolean], "view">;
+
+  setResult: TypedContractMethod<[value: boolean], [void], "nonpayable">;
+
   verifyProof: TypedContractMethod<
     [
       arg0: [BigNumberish, BigNumberish],
@@ -97,6 +107,12 @@ export interface Groth16Verifier extends BaseContract {
     key: string | FunctionFragment
   ): T;
 
+  getFunction(
+    nameOrSignature: "result"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "setResult"
+  ): TypedContractMethod<[value: boolean], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "verifyProof"
   ): TypedContractMethod<

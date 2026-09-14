@@ -34,9 +34,17 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.CertifyRegistry__factory>;
     getContractFactory(
+      name: "IGroth16Verifier",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.IGroth16Verifier__factory>;
+    getContractFactory(
       name: "IZKVerifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IZKVerifier__factory>;
+    getContractFactory(
+      name: "MockGroth16Verifier",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.MockGroth16Verifier__factory>;
     getContractFactory(
       name: "Groth16Verifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
@@ -76,10 +84,20 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.CertifyRegistry>;
     getContractAt(
+      name: "IGroth16Verifier",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IGroth16Verifier>;
+    getContractAt(
       name: "IZKVerifier",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.IZKVerifier>;
+    getContractAt(
+      name: "MockGroth16Verifier",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.MockGroth16Verifier>;
     getContractAt(
       name: "Groth16Verifier",
       address: string | ethers.Addressable,
@@ -117,9 +135,17 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.CertifyRegistry>;
     deployContract(
+      name: "IGroth16Verifier",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.IGroth16Verifier>;
+    deployContract(
       name: "IZKVerifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IZKVerifier>;
+    deployContract(
+      name: "MockGroth16Verifier",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.MockGroth16Verifier>;
     deployContract(
       name: "Groth16Verifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
@@ -159,10 +185,20 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.CertifyRegistry>;
     deployContract(
+      name: "IGroth16Verifier",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.IGroth16Verifier>;
+    deployContract(
       name: "IZKVerifier",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IZKVerifier>;
+    deployContract(
+      name: "MockGroth16Verifier",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.MockGroth16Verifier>;
     deployContract(
       name: "Groth16Verifier",
       args: any[],
