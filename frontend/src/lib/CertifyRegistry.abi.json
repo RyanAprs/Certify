@@ -8,7 +8,7 @@
       },
       {
         "internalType": "address",
-        "name": "verifier",
+        "name": "rangeVerifier",
         "type": "address"
       }
     ],
@@ -266,6 +266,25 @@
     "inputs": [
       {
         "indexed": true,
+        "internalType": "bytes32",
+        "name": "predicateId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "verifier",
+        "type": "address"
+      }
+    ],
+    "name": "VerifierSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "uint256",
         "name": "certificateId",
         "type": "uint256"
@@ -277,6 +296,12 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "predicateId",
+        "type": "bytes32"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "keyHash",
@@ -285,7 +310,7 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "threshold",
+        "name": "param",
         "type": "uint256"
       }
     ],
@@ -308,6 +333,32 @@
   {
     "inputs": [],
     "name": "ISSUER_ADMIN_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PREDICATE_EQUALITY",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PREDICATE_RANGE",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -705,6 +756,24 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "predicateId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "verifier",
+        "type": "address"
+      }
+    ],
+    "name": "setVerifier",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "certificateId",
         "type": "uint256"
@@ -771,6 +840,64 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "predicateId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "verifiers",
+    "outputs": [
+      {
+        "internalType": "contract IGroth16Verifier",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "certificateId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[2]",
+        "name": "a",
+        "type": "uint256[2]"
+      },
+      {
+        "internalType": "uint256[2][2]",
+        "name": "b",
+        "type": "uint256[2][2]"
+      },
+      {
+        "internalType": "uint256[2]",
+        "name": "c",
+        "type": "uint256[2]"
+      },
+      {
+        "internalType": "uint256[3]",
+        "name": "pubSignals",
+        "type": "uint256[3]"
+      }
+    ],
+    "name": "verifyEqualityProof",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "certificateId",
         "type": "uint256"
@@ -805,19 +932,6 @@
       }
     ],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "zkVerifier",
-    "outputs": [
-      {
-        "internalType": "contract IGroth16Verifier",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   }
 ]

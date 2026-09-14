@@ -1,15 +1,17 @@
 # ZK artifacts (generated — do not hand-edit)
 
-These files are produced by the circuit build:
+Produced by the circuit build (builds BOTH predicate circuits):
 
     cd zk && npm install && ./build.sh
 
-which writes `range.wasm`, `range.zkey`, and `verification_key.json` here, and
-regenerates `contracts/contracts/verifier.sol` (the `Groth16Verifier`).
+Writes here:
+- `range.wasm` / `range.zkey` / `range.vkey.json`         (value ≥ threshold, and expiry)
+- `equality.wasm` / `equality.zkey` / `equality.vkey.json` (claim == value)
 
-Requires `circom` v2 (https://docs.circom.io/getting-started/installation/) and
-a powers-of-tau of power ≥ 14 (the Merkle path makes the circuit larger than the
-old GPA circuit). `build.sh` prints the download command if it's missing.
+and regenerates `contracts/contracts/verifiers/{RangeVerifier,EqualityVerifier}.sol`.
 
-Until they are built, proof generation is disabled and the Verifier page shows a
-warning. Public signal layout: `[0] = root`, `[1] = keyHash`, `[2] = threshold`.
+Requires `circom` v2 (https://docs.circom.io/getting-started/installation/) and a
+powers-of-tau of power ≥ 14. `build.sh` prints the download command if missing.
+
+Until built, proof generation is disabled and the Verifier page shows a warning.
+Public signals — range: `[root, keyHash, threshold]` · equality: `[root, keyHash, value]`.

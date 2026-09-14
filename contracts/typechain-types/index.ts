@@ -20,5 +20,7 @@ export type { IGroth16Verifier } from "./contracts/CertifyRegistry.sol/IGroth16V
 export { IGroth16Verifier__factory } from "./factories/contracts/CertifyRegistry.sol/IGroth16Verifier__factory";
 export type { MockGroth16Verifier } from "./contracts/mocks/MockGroth16Verifier";
 export { MockGroth16Verifier__factory } from "./factories/contracts/mocks/MockGroth16Verifier__factory";
-export type { Groth16Verifier } from "./contracts/verifier.sol/Groth16Verifier";
-export { Groth16Verifier__factory } from "./factories/contracts/verifier.sol/Groth16Verifier__factory";
+export type { EqualityVerifier } from "./contracts/verifiers/EqualityVerifier";
+export { EqualityVerifier__factory } from "./factories/contracts/verifiers/EqualityVerifier__factory";
+export type { RangeVerifier } from "./contracts/verifiers/RangeVerifier";
+export { RangeVerifier__factory } from "./factories/contracts/verifiers/RangeVerifier__factory";

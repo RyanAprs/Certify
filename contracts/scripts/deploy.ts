@@ -7,19 +7,29 @@ async function main() {
   console.log("Deploying with account:", deployer.address);
   console.log("Network:", network.name);
 
-  // 1. Groth16 verifier (regenerate the real one via `cd zk && ./build.sh`).
-  const Verifier = await ethers.getContractFactory("Groth16Verifier");
-  const verifier = await Verifier.deploy();
-  await verifier.waitForDeployment();
-  const verifierAddress = await verifier.getAddress();
-  console.log("Groth16Verifier:", verifierAddress);
+  // 1. Predicate verifiers (regenerate the real ones via `cd zk && ./build.sh`).
+  const Range = await ethers.getContractFactory("RangeVerifier");
+  const rangeVerifier = await Range.deploy();
+  await rangeVerifier.waitForDeployment();
+  const rangeAddress = await rangeVerifier.getAddress();
+  console.log("RangeVerifier:", rangeAddress);
 
-  // 2. CertifyRegistry (single registry) wired to the verifier.
+  const Equality = await ethers.getContractFactory("EqualityVerifier");
+  const equalityVerifier = await Equality.deploy();
+  await equalityVerifier.waitForDeployment();
+  const equalityAddress = await equalityVerifier.getAddress();
+  console.log("EqualityVerifier:", equalityAddress);
+
+  // 2. CertifyRegistry (range verifier in the constructor, equality registered after).
   const Registry = await ethers.getContractFactory("CertifyRegistry");
-  const registry = await Registry.deploy(deployer.address, verifierAddress);
+  const registry = await Registry.deploy(deployer.address, rangeAddress);
   await registry.waitForDeployment();
   const registryAddress = await registry.getAddress();
   console.log("CertifyRegistry:", registryAddress);
+
+  const PREDICATE_EQUALITY = await registry.PREDICATE_EQUALITY();
+  await (await registry.setVerifier(PREDICATE_EQUALITY, equalityAddress)).wait();
+  console.log("Registered EqualityVerifier");
 
   const deployTx = registry.deploymentTransaction();
   const deploymentBlock = deployTx
@@ -32,7 +42,8 @@ async function main() {
     chainId: Number(network.config.chainId ?? 31337),
     network: network.name,
     registry: registryAddress,
-    verifier: verifierAddress,
+    rangeVerifier: rangeAddress,
+    equalityVerifier: equalityAddress,
     deploymentBlock,
   };
 

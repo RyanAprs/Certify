@@ -52,6 +52,8 @@ export interface CertifyRegistryInterface extends Interface {
     nameOrSignature:
       | "DEFAULT_ADMIN_ROLE"
       | "ISSUER_ADMIN_ROLE"
+      | "PREDICATE_EQUALITY"
+      | "PREDICATE_RANGE"
       | "certificates"
       | "getDisclosures"
       | "getHolderCertificates"
@@ -68,11 +70,13 @@ export interface CertifyRegistryInterface extends Interface {
       | "requestMembership"
       | "revokeRole"
       | "setCertificateStatus"
+      | "setVerifier"
       | "shareCertificate"
       | "supportsInterface"
       | "usedProofs"
+      | "verifiers"
+      | "verifyEqualityProof"
       | "verifyRangeProof"
-      | "zkVerifier"
   ): FunctionFragment;
 
   getEvent(
@@ -86,6 +90,7 @@ export interface CertifyRegistryInterface extends Interface {
       | "RoleAdminChanged"
       | "RoleGranted"
       | "RoleRevoked"
+      | "VerifierSet"
       | "ZKVerified"
   ): EventFragment;
 
@@ -95,6 +100,14 @@ export interface CertifyRegistryInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "ISSUER_ADMIN_ROLE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "PREDICATE_EQUALITY",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "PREDICATE_RANGE",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -162,6 +175,10 @@ export interface CertifyRegistryInterface extends Interface {
     values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "setVerifier",
+    values: [BytesLike, AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "shareCertificate",
     values: [BigNumberish, AddressLike, BytesLike, string]
   ): string;
@@ -174,7 +191,11 @@ export interface CertifyRegistryInterface extends Interface {
     values: [BytesLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "verifyRangeProof",
+    functionFragment: "verifiers",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "verifyEqualityProof",
     values: [
       BigNumberish,
       [BigNumberish, BigNumberish],
@@ -184,8 +205,14 @@ export interface CertifyRegistryInterface extends Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "zkVerifier",
-    values?: undefined
+    functionFragment: "verifyRangeProof",
+    values: [
+      BigNumberish,
+      [BigNumberish, BigNumberish],
+      [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      [BigNumberish, BigNumberish],
+      [BigNumberish, BigNumberish, BigNumberish]
+    ]
   ): string;
 
   decodeFunctionResult(
@@ -194,6 +221,14 @@ export interface CertifyRegistryInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "ISSUER_ADMIN_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "PREDICATE_EQUALITY",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "PREDICATE_RANGE",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -252,6 +287,10 @@ export interface CertifyRegistryInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "setVerifier",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "shareCertificate",
     data: BytesLike
   ): Result;
@@ -260,11 +299,15 @@ export interface CertifyRegistryInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "usedProofs", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "verifiers", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "verifyEqualityProof",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "verifyRangeProof",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "zkVerifier", data: BytesLike): Result;
 }
 
 export namespace CertificateIssuedEvent {
@@ -435,24 +478,40 @@ export namespace RoleRevokedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace VerifierSetEvent {
+  export type InputTuple = [predicateId: BytesLike, verifier: AddressLike];
+  export type OutputTuple = [predicateId: string, verifier: string];
+  export interface OutputObject {
+    predicateId: string;
+    verifier: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export namespace ZKVerifiedEvent {
   export type InputTuple = [
     certificateId: BigNumberish,
     verifier: AddressLike,
+    predicateId: BytesLike,
     keyHash: BigNumberish,
-    threshold: BigNumberish
+    param: BigNumberish
   ];
   export type OutputTuple = [
     certificateId: bigint,
     verifier: string,
+    predicateId: string,
     keyHash: bigint,
-    threshold: bigint
+    param: bigint
   ];
   export interface OutputObject {
     certificateId: bigint;
     verifier: string;
+    predicateId: string;
     keyHash: bigint;
-    threshold: bigint;
+    param: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -506,6 +565,10 @@ export interface CertifyRegistry extends BaseContract {
   DEFAULT_ADMIN_ROLE: TypedContractMethod<[], [string], "view">;
 
   ISSUER_ADMIN_ROLE: TypedContractMethod<[], [string], "view">;
+
+  PREDICATE_EQUALITY: TypedContractMethod<[], [string], "view">;
+
+  PREDICATE_RANGE: TypedContractMethod<[], [string], "view">;
 
   certificates: TypedContractMethod<
     [certificateId: BigNumberish],
@@ -621,6 +684,12 @@ export interface CertifyRegistry extends BaseContract {
     "nonpayable"
   >;
 
+  setVerifier: TypedContractMethod<
+    [predicateId: BytesLike, verifier: AddressLike],
+    [void],
+    "nonpayable"
+  >;
+
   shareCertificate: TypedContractMethod<
     [
       certificateId: BigNumberish,
@@ -640,6 +709,20 @@ export interface CertifyRegistry extends BaseContract {
 
   usedProofs: TypedContractMethod<[proofHash: BytesLike], [boolean], "view">;
 
+  verifiers: TypedContractMethod<[predicateId: BytesLike], [string], "view">;
+
+  verifyEqualityProof: TypedContractMethod<
+    [
+      certificateId: BigNumberish,
+      a: [BigNumberish, BigNumberish],
+      b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      c: [BigNumberish, BigNumberish],
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
+    ],
+    [boolean],
+    "nonpayable"
+  >;
+
   verifyRangeProof: TypedContractMethod<
     [
       certificateId: BigNumberish,
@@ -652,8 +735,6 @@ export interface CertifyRegistry extends BaseContract {
     "nonpayable"
   >;
 
-  zkVerifier: TypedContractMethod<[], [string], "view">;
-
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
   ): T;
@@ -663,6 +744,12 @@ export interface CertifyRegistry extends BaseContract {
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "ISSUER_ADMIN_ROLE"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "PREDICATE_EQUALITY"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "PREDICATE_RANGE"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "certificates"
@@ -775,6 +862,13 @@ export interface CertifyRegistry extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "setVerifier"
+  ): TypedContractMethod<
+    [predicateId: BytesLike, verifier: AddressLike],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "shareCertificate"
   ): TypedContractMethod<
     [
@@ -793,7 +887,10 @@ export interface CertifyRegistry extends BaseContract {
     nameOrSignature: "usedProofs"
   ): TypedContractMethod<[proofHash: BytesLike], [boolean], "view">;
   getFunction(
-    nameOrSignature: "verifyRangeProof"
+    nameOrSignature: "verifiers"
+  ): TypedContractMethod<[predicateId: BytesLike], [string], "view">;
+  getFunction(
+    nameOrSignature: "verifyEqualityProof"
   ): TypedContractMethod<
     [
       certificateId: BigNumberish,
@@ -806,8 +903,18 @@ export interface CertifyRegistry extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "zkVerifier"
-  ): TypedContractMethod<[], [string], "view">;
+    nameOrSignature: "verifyRangeProof"
+  ): TypedContractMethod<
+    [
+      certificateId: BigNumberish,
+      a: [BigNumberish, BigNumberish],
+      b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      c: [BigNumberish, BigNumberish],
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
+    ],
+    [boolean],
+    "nonpayable"
+  >;
 
   getEvent(
     key: "CertificateIssued"
@@ -871,6 +978,13 @@ export interface CertifyRegistry extends BaseContract {
     RoleRevokedEvent.InputTuple,
     RoleRevokedEvent.OutputTuple,
     RoleRevokedEvent.OutputObject
+  >;
+  getEvent(
+    key: "VerifierSet"
+  ): TypedContractEvent<
+    VerifierSetEvent.InputTuple,
+    VerifierSetEvent.OutputTuple,
+    VerifierSetEvent.OutputObject
   >;
   getEvent(
     key: "ZKVerified"
@@ -980,7 +1094,18 @@ export interface CertifyRegistry extends BaseContract {
       RoleRevokedEvent.OutputObject
     >;
 
-    "ZKVerified(uint256,address,uint256,uint256)": TypedContractEvent<
+    "VerifierSet(bytes32,address)": TypedContractEvent<
+      VerifierSetEvent.InputTuple,
+      VerifierSetEvent.OutputTuple,
+      VerifierSetEvent.OutputObject
+    >;
+    VerifierSet: TypedContractEvent<
+      VerifierSetEvent.InputTuple,
+      VerifierSetEvent.OutputTuple,
+      VerifierSetEvent.OutputObject
+    >;
+
+    "ZKVerified(uint256,address,bytes32,uint256,uint256)": TypedContractEvent<
       ZKVerifiedEvent.InputTuple,
       ZKVerifiedEvent.OutputTuple,
       ZKVerifiedEvent.OutputObject

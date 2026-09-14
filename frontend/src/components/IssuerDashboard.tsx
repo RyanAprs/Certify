@@ -110,8 +110,14 @@ export const IssuerDashboard = () => {
       const file = values.image?.item(0);
       if (!file) throw new Error("Certificate image is required");
 
-      const rawClaims: Record<string, number> = {};
-      for (const f of schema.claims) rawClaims[f.key] = parseFloat(values.claims[f.key]);
+      const rawClaims: Record<string, number | string> = {};
+      for (const f of schema.claims) {
+        const raw = values.claims[f.key];
+        if (f.kind === "string") rawClaims[f.key] = raw;
+        else if (f.kind === "timestamp")
+          rawClaims[f.key] = Math.floor(new Date(raw).getTime() / 1000);
+        else rawClaims[f.key] = parseFloat(raw);
+      }
 
       // Merkle root of the claims — computed here so it matches the circuit.
       const { rootHex, salts } = buildCommitment(schema, rawClaims);
@@ -238,33 +244,46 @@ export const IssuerDashboard = () => {
               </span>
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              {schema.claims.map((f) => (
-                <Field
-                  key={f.key}
-                  label={`${f.label}${f.unit ? ` (${f.unit})` : ""}`}
-                  hint={`${f.min}–${f.max}`}
-                  error={(errors.claims as any)?.[f.key]?.message}
-                >
-                  <input
-                    className="input"
-                    type="number"
-                    min={f.min}
-                    max={f.max}
-                    step={f.step ?? "any"}
-                    disabled={isIssuing}
-                    {...form.register(`claims.${f.key}` as const, {
-                      required: `${f.label} is required`,
-                      validate: (v) => {
-                        const n = parseFloat(v);
-                        return (
-                          (!isNaN(n) && n >= f.min && n <= f.max) ||
-                          `Must be between ${f.min} and ${f.max}`
-                        );
-                      },
-                    })}
-                  />
-                </Field>
-              ))}
+              {schema.claims.map((f) => {
+                const inputType =
+                  f.kind === "timestamp" ? "date" : f.kind === "string" ? "text" : "number";
+                const hint =
+                  f.kind === "number" && f.min !== undefined
+                    ? `${f.min}–${f.max}${f.unit ? ` ${f.unit}` : ""}`
+                    : f.kind === "timestamp"
+                    ? "expiry date"
+                    : undefined;
+                return (
+                  <Field
+                    key={f.key}
+                    label={f.label}
+                    hint={hint}
+                    error={(errors.claims as any)?.[f.key]?.message}
+                  >
+                    <input
+                      className="input"
+                      type={inputType}
+                      {...(f.kind === "number"
+                        ? { min: f.min, max: f.max, step: f.step ?? "any" }
+                        : {})}
+                      disabled={isIssuing}
+                      {...form.register(`claims.${f.key}` as const, {
+                        required: `${f.label} is required`,
+                        validate: (v) => {
+                          if (f.kind !== "number") return true;
+                          const n = parseFloat(v);
+                          return (
+                            (!isNaN(n) &&
+                              n >= (f.min ?? -Infinity) &&
+                              n <= (f.max ?? Infinity)) ||
+                            `Must be between ${f.min} and ${f.max}`
+                          );
+                        },
+                      })}
+                    />
+                  </Field>
+                );
+              })}
             </div>
           </div>
 

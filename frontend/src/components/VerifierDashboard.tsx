@@ -10,9 +10,10 @@ import { publicClient, registryContract } from "../lib/contract";
 import { fetchFromIpfs, ipfsUrl } from "../lib/ipfs";
 import { DataChip, EmptyState, Field, Notice, PageHeader, Spinner, StatusBadge } from "./Shared";
 import { CertificateStatus } from "../types";
-import { getSchema, Schema } from "../lib/schemas";
+import { getSchema, Schema, Predicate } from "../lib/schemas";
 import {
   generateRangeProof,
+  generateEqualityProof,
   verifyProof,
   formatProofForSolidity,
   validateZkFiles,
@@ -34,6 +35,11 @@ function toStatus(n: number): CertificateStatus {
   return n === 0 ? "Pending" : n === 1 ? "Active" : "Revoked";
 }
 
+const PREDICATE_LABEL: Record<Predicate, string> = {
+  range: "Threshold ≥",
+  equality: "Equals",
+};
+
 export const VerifierDashboard = () => {
   const { isConnected } = useAccount();
   const { write } = useRegistryWrite();
@@ -44,8 +50,11 @@ export const VerifierDashboard = () => {
   const [isSearching, setIsSearching] = useState(false);
 
   const [claimKey, setClaimKey] = useState<string>("");
+  const [predicate, setPredicate] = useState<Predicate>("range");
   const [threshold, setThreshold] = useState("");
-  const [zkProof, setZkProof] = useState<ZKProof | null>(null);
+  const [eqValue, setEqValue] = useState("");
+
+  const [zkProof, setZkProof] = useState<{ proof: ZKProof; predicate: Predicate } | null>(null);
   const [localVerified, setLocalVerified] = useState<boolean | null>(null);
   const [zkLoading, setZkLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -56,6 +65,7 @@ export const VerifierDashboard = () => {
     [cert]
   );
   const claimField = schema?.claims.find((f) => f.key === claimKey);
+  const isExpiry = claimField?.kind === "timestamp" && predicate === "range";
 
   const { data: disclosures } = useDisclosures(
     certificateId ? BigInt(certificateId) : undefined
@@ -64,6 +74,15 @@ export const VerifierDashboard = () => {
   useEffect(() => {
     validateZkFiles().then((s) => setZkFilesOk(s.wasm && s.zkey && s.vkey));
   }, []);
+
+  function selectClaim(key: string) {
+    setClaimKey(key);
+    setZkProof(null);
+    setThreshold("");
+    setEqValue("");
+    const f = schema?.claims.find((c) => c.key === key);
+    setPredicate(f?.predicates[0] ?? "range");
+  }
 
   const onSearch = async () => {
     if (!certificateId) return;
@@ -92,8 +111,11 @@ export const VerifierDashboard = () => {
       };
       setCert(found);
       const sc = getSchema(found.schemaId);
-      setClaimKey(sc?.claims[0]?.key ?? "");
+      const firstClaim = sc?.claims[0];
+      setClaimKey(firstClaim?.key ?? "");
+      setPredicate(firstClaim?.predicates[0] ?? "range");
       setThreshold("");
+      setEqValue("");
       if (found.metadataCid) {
         try {
           setMetadata(await fetchFromIpfs<CredentialMetadata>(found.metadataCid));
@@ -113,14 +135,21 @@ export const VerifierDashboard = () => {
     if (!metadata.salts) {
       return toast.error("This credential has no ZK salts (issued before the ZK upgrade).");
     }
-    const t = parseFloat(threshold);
-    if (isNaN(t)) return toast.error("Enter a threshold");
     setZkLoading(true);
     setLocalVerified(null);
     try {
-      const proof = await generateRangeProof(schema, metadata, claimKey, t);
-      setZkProof(proof);
-      setLocalVerified(await verifyProof(proof));
+      let proof: ZKProof;
+      if (predicate === "equality") {
+        const v = claimField.kind === "number" ? parseFloat(eqValue) : eqValue;
+        if (v === "" || (typeof v === "number" && isNaN(v))) throw new Error("Enter a value to match");
+        proof = await generateEqualityProof(schema, metadata, claimKey, v);
+      } else {
+        const t = isExpiry ? Math.floor(Date.now() / 1000) : parseFloat(threshold);
+        if (isNaN(t)) throw new Error("Enter a threshold");
+        proof = await generateRangeProof(schema, metadata, claimKey, t);
+      }
+      setZkProof({ proof, predicate });
+      setLocalVerified(await verifyProof(proof, predicate));
       toast.success("Proof generated & self-verified");
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to generate proof");
@@ -133,8 +162,9 @@ export const VerifierDashboard = () => {
     if (!zkProof || !cert) return;
     setIsVerifying(true);
     try {
-      const { a, b, c, pubSignals } = formatProofForSolidity(zkProof);
-      await write("verifyRangeProof", [cert.id, a, b, c, pubSignals], {
+      const { a, b, c, pubSignals } = formatProofForSolidity(zkProof.proof);
+      const fn = zkProof.predicate === "equality" ? "verifyEqualityProof" : "verifyRangeProof";
+      await write(fn, [cert.id, a, b, c, pubSignals], {
         pending: "Verifying proof on-chain…",
         success: "Proof verified on-chain",
       });
@@ -151,15 +181,14 @@ export const VerifierDashboard = () => {
         icon={<ShieldCheck size={22} aria-hidden="true" />}
         eyebrow="Workspace"
         title="Verifier"
-        description="Look up a credential and verify a threshold on-chain — without seeing the underlying value."
+        description="Look up a credential and verify a claim on-chain — without seeing the underlying value."
       />
 
       {zkFilesOk === false && (
         <div className="mb-6">
           <Notice tone="warning" title="ZK artifacts not built">
-            <code>range.wasm</code> / <code>range.zkey</code> are missing from{" "}
-            <code>public/zk/</code>. Run <code>cd zk &amp;&amp; ./build.sh</code>{" "}
-            before generating proofs.
+            <code>range.*</code> / <code>equality.*</code> are missing from{" "}
+            <code>public/zk/</code>. Run <code>cd zk &amp;&amp; ./build.sh</code> before generating proofs.
           </Notice>
         </div>
       )}
@@ -190,7 +219,7 @@ export const VerifierDashboard = () => {
               <div className="min-w-0">
                 {metadata ? (
                   <>
-                    <div className="mb-1 flex items-center gap-2">
+                    <div className="mb-1">
                       <span className="badge border-primary/25 bg-primary-tint text-primary">
                         {schema?.label ?? "Unknown type"}
                       </span>
@@ -218,26 +247,23 @@ export const VerifierDashboard = () => {
       </div>
 
       {/* Presentation request */}
-      {metadata && schema && (
+      {metadata && schema && claimField && (
         <div className="panel-pad mt-6 space-y-5">
           <div className="flex items-center gap-2">
             <Cpu size={17} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-ink">Request a proof</h2>
           </div>
 
+          {/* Claim */}
           {schema.claims.length > 1 && (
             <div>
-              <span className="label">Claim to prove</span>
+              <span className="label">Claim</span>
               <div className="flex flex-wrap gap-2">
                 {schema.claims.map((f) => (
                   <button
                     key={f.key}
                     type="button"
-                    onClick={() => {
-                      setClaimKey(f.key);
-                      setThreshold("");
-                      setZkProof(null);
-                    }}
+                    onClick={() => selectClaim(f.key)}
                     className={clsx(
                       "rounded-md border px-3 py-1.5 text-sm font-medium transition",
                       f.key === claimKey
@@ -252,26 +278,69 @@ export const VerifierDashboard = () => {
             </div>
           )}
 
+          {/* Predicate */}
+          {claimField.predicates.length > 1 && (
+            <div>
+              <span className="label">Statement</span>
+              <div className="flex flex-wrap gap-2">
+                {claimField.predicates.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setPredicate(p);
+                      setZkProof(null);
+                    }}
+                    className={clsx(
+                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
+                      p === predicate
+                        ? "border-primary bg-primary-tint text-ink"
+                        : "border-line-strong text-ink-muted hover:border-primary/40"
+                    )}
+                  >
+                    {PREDICATE_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Input */}
           <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Field
-              label={`Minimum ${claimField?.label ?? "value"} to prove`}
-              hint={
-                claimField
-                  ? `Proves ${claimField.label} ≥ threshold (range ${claimField.min}–${claimField.max}), value stays hidden`
-                  : undefined
-              }
-            >
-              <input
-                className="input"
-                type="number"
-                min={claimField?.min}
-                max={claimField?.max}
-                step={claimField?.step ?? "any"}
-                value={threshold}
-                onChange={(e) => setThreshold(e.target.value)}
-                placeholder={claimField ? String(claimField.min) : ""}
-              />
-            </Field>
+            {isExpiry ? (
+              <p className="text-sm text-ink-muted">
+                Proves <strong>{claimField.label}</strong> ≥ now — i.e. the credential is not expired.
+              </p>
+            ) : predicate === "equality" ? (
+              <Field label={`${claimField.label} equals`} hint="Revealed to the verifier; other claims stay hidden">
+                <input
+                  className="input"
+                  type={claimField.kind === "number" ? "number" : "text"}
+                  value={eqValue}
+                  onChange={(e) => setEqValue(e.target.value)}
+                  placeholder={claimField.kind === "string" ? "e.g. BNSP" : "value"}
+                />
+              </Field>
+            ) : (
+              <Field
+                label={`Minimum ${claimField.label}`}
+                hint={
+                  claimField.min !== undefined
+                    ? `Proves ${claimField.label} ≥ threshold (range ${claimField.min}–${claimField.max})`
+                    : "Value stays hidden"
+                }
+              >
+                <input
+                  className="input"
+                  type="number"
+                  min={claimField.min}
+                  max={claimField.max}
+                  step={claimField.step ?? "any"}
+                  value={threshold}
+                  onChange={(e) => setThreshold(e.target.value)}
+                />
+              </Field>
+            )}
             <button
               className="btn-secondary"
               onClick={onGenerateProof}

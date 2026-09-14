@@ -42,9 +42,13 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.MockGroth16Verifier__factory>;
     getContractFactory(
-      name: "Groth16Verifier",
+      name: "EqualityVerifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Groth16Verifier__factory>;
+    ): Promise<Contracts.EqualityVerifier__factory>;
+    getContractFactory(
+      name: "RangeVerifier",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.RangeVerifier__factory>;
 
     getContractAt(
       name: "AccessControl",
@@ -82,10 +86,15 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.MockGroth16Verifier>;
     getContractAt(
-      name: "Groth16Verifier",
+      name: "EqualityVerifier",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
-    ): Promise<Contracts.Groth16Verifier>;
+    ): Promise<Contracts.EqualityVerifier>;
+    getContractAt(
+      name: "RangeVerifier",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.RangeVerifier>;
 
     deployContract(
       name: "AccessControl",
@@ -116,9 +125,13 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.MockGroth16Verifier>;
     deployContract(
-      name: "Groth16Verifier",
+      name: "EqualityVerifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Groth16Verifier>;
+    ): Promise<Contracts.EqualityVerifier>;
+    deployContract(
+      name: "RangeVerifier",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.RangeVerifier>;
 
     deployContract(
       name: "AccessControl",
@@ -156,10 +169,15 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.MockGroth16Verifier>;
     deployContract(
-      name: "Groth16Verifier",
+      name: "EqualityVerifier",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Groth16Verifier>;
+    ): Promise<Contracts.EqualityVerifier>;
+    deployContract(
+      name: "RangeVerifier",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.RangeVerifier>;
 
     // default types
     getContractFactory(

@@ -243,7 +243,7 @@ interface CertificateMetadata {
   institution: string;
   program: string;
   type?: string;
-  claims?: Record<string, number>;
+  claims?: Record<string, number | string>;
   description?: string;
   imageCid?: string;
   issuedAt?: string;
@@ -315,8 +315,9 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
                         >
                           <span className="text-xs text-ink-subtle">{f.label}</span>
                           <span className="font-mono text-sm font-semibold text-ink">
-                            {metadata.claims[f.key]}
-                            {f.unit ?? ""}
+                            {f.kind === "timestamp"
+                              ? format(Number(metadata.claims[f.key]) * 1000, "d MMM yyyy")
+                              : `${metadata.claims[f.key]}${f.unit ?? ""}`}
                           </span>
                         </div>
                       ) : null

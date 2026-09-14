@@ -25,6 +25,9 @@ describe("CertifyRegistry", () => {
     )) as CertifyRegistry;
     await registry.waitForDeployment();
 
+    // Register the same mock as the equality verifier too.
+    await registry.setVerifier(await registry.PREDICATE_EQUALITY(), await mock.getAddress());
+
     return { admin, holder, verifier, mock, registry };
   }
 
@@ -107,14 +110,14 @@ describe("CertifyRegistry", () => {
         .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, [1n, KEY_HASH, 300n])
     ).to.be.revertedWith("commitment mismatch");
 
-    // Happy path (mock returns true) — emits keyHash + threshold.
+    // Happy path (mock returns true) — emits predicateId + keyHash + param.
     await expect(
       registry
         .connect(verifier)
         .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
     )
       .to.emit(registry, "ZKVerified")
-      .withArgs(ids[0], verifier.address, KEY_HASH, 300n);
+      .withArgs(ids[0], verifier.address, ethers.id("range"), KEY_HASH, 300n);
 
     // Same proof cannot be replayed.
     await expect(
@@ -131,6 +134,50 @@ describe("CertifyRegistry", () => {
         .connect(verifier)
         .verifyRangeProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub2)
     ).to.be.revertedWith("invalid proof");
+  });
+
+  it("verifies an equality proof via the registered equality verifier", async () => {
+    const { admin, holder, verifier, registry } = await deploy();
+    const commitment = ethers.zeroPadValue("0xbeef", 32);
+    await issueTo(registry, admin, holder, commitment);
+    const ids = await registry.getHolderCertificates(holder.address);
+
+    const pub: [bigint, bigint, bigint] = [BigInt(commitment), KEY_HASH, 42n];
+    await expect(
+      registry
+        .connect(verifier)
+        .verifyEqualityProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
+    )
+      .to.emit(registry, "ZKVerified")
+      .withArgs(ids[0], verifier.address, ethers.id("equality"), KEY_HASH, 42n);
+  });
+
+  it("rejects a predicate with no registered verifier", async () => {
+    const { admin, holder, verifier, registry } = await deploy();
+    const commitment = ethers.zeroPadValue("0x1234", 32);
+    await issueTo(registry, admin, holder, commitment);
+    const ids = await registry.getHolderCertificates(holder.address);
+    // Point the equality slot at the zero address is impossible (setVerifier
+    // rejects it); instead deploy a fresh registry where equality is unset.
+    const Mock = await ethers.getContractFactory("MockGroth16Verifier");
+    const mock = await Mock.deploy();
+    const Registry = await ethers.getContractFactory("CertifyRegistry");
+    const bare = await Registry.deploy(admin.address, await mock.getAddress());
+    await bare.connect(holder).requestMembership(admin.address);
+    await bare.connect(admin).manageMember(holder.address, true);
+    await bare.connect(admin).issueCertificate(holder.address, "cid", commitment, SCHEMA);
+    await expect(
+      bare
+        .connect(verifier)
+        .verifyEqualityProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, [BigInt(commitment), KEY_HASH, 1n])
+    ).to.be.revertedWith("unknown predicate");
+  });
+
+  it("only admin can register a verifier", async () => {
+    const { holder, registry } = await deploy();
+    await expect(
+      registry.connect(holder).setVerifier(ethers.id("range"), holder.address)
+    ).to.be.reverted; // AccessControlUnauthorizedAccount
   });
 
   it("records disclosures for active certificates", async () => {

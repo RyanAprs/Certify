@@ -3,4 +3,4 @@
 /* eslint-disable */
 export * as certifyRegistrySol from "./CertifyRegistry.sol";
 export * as mocks from "./mocks";
-export * as verifierSol from "./verifier.sol";
+export * as verifiers from "./verifiers";

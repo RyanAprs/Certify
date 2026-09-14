@@ -60,7 +60,12 @@ contract CertifyRegistry is AccessControl {
         uint64 timestamp;
     }
 
-    IGroth16Verifier public immutable zkVerifier;
+    // Predicate circuits. Each has its own Groth16 verifier (same uint[3] ABI,
+    // different verification key). Routed via the registry below.
+    bytes32 public constant PREDICATE_RANGE = keccak256("range");
+    bytes32 public constant PREDICATE_EQUALITY = keccak256("equality");
+
+    mapping(bytes32 predicateId => IGroth16Verifier) public verifiers;
     uint256 private _certificateIdTracker;
 
     mapping(address issuer => bool) public registeredIssuers;
@@ -78,8 +83,9 @@ contract CertifyRegistry is AccessControl {
     event CertificateIssued(uint256 indexed certificateId, address indexed issuer, address indexed holder, bytes32 schemaId);
     event CertificateStatusChanged(uint256 indexed certificateId, CertificateStatus status);
     event CertificateShared(uint256 indexed certificateId, address indexed holder, address indexed verifier, bytes32 queryHash, string encryptedPayloadCid);
-    // keyHash identifies the claim proven; threshold is the minimum value proven.
-    event ZKVerified(uint256 indexed certificateId, address indexed verifier, uint256 keyHash, uint256 threshold);
+    event VerifierSet(bytes32 indexed predicateId, address verifier);
+    // predicateId names the circuit; keyHash the claim; param = threshold (range) or value (equality).
+    event ZKVerified(uint256 indexed certificateId, address indexed verifier, bytes32 indexed predicateId, uint256 keyHash, uint256 param);
 
     modifier onlyIssuer(address issuer) {
         require(registeredIssuers[issuer], "Issuer not registered");
@@ -87,14 +93,22 @@ contract CertifyRegistry is AccessControl {
         _;
     }
 
-    constructor(address admin, address verifier) {
+    constructor(address admin, address rangeVerifier) {
         require(admin != address(0), "admin required");
-        require(verifier != address(0), "verifier required");
+        require(rangeVerifier != address(0), "verifier required");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ISSUER_ADMIN_ROLE, admin);
         registeredIssuers[admin] = true;
         emit IssuerRegistered(admin, admin);
-        zkVerifier = IGroth16Verifier(verifier);
+        verifiers[PREDICATE_RANGE] = IGroth16Verifier(rangeVerifier);
+        emit VerifierSet(PREDICATE_RANGE, rangeVerifier);
+    }
+
+    /// @notice Register/replace the Groth16 verifier for a predicate circuit.
+    function setVerifier(bytes32 predicateId, address verifier) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(verifier != address(0), "invalid verifier");
+        verifiers[predicateId] = IGroth16Verifier(verifier);
+        emit VerifierSet(predicateId, verifier);
     }
 
     // ===== Issuer Management =====
@@ -205,15 +219,10 @@ contract CertifyRegistry is AccessControl {
     // ===== Verifier =====
 
     /**
-     * @notice Verify a Groth16 range proof: the claim identified by
-     *         `pubSignals[1]` (keyHash) in this certificate has a value
-     *         ≥ `pubSignals[2]` (threshold), without revealing the value.
-     * @param certificateId Certificate whose Merkle root the proof must open.
-     * @param a,b,c Groth16 proof points.
+     * @notice Verify a Groth16 RANGE proof: the claim `pubSignals[1]` (keyHash)
+     *         has value ≥ `pubSignals[2]` (threshold), without revealing it.
+     *         Also used for expiry ("validUntil ≥ now").
      * @param pubSignals [0]=root, [1]=keyHash, [2]=threshold.
-     *
-     * The caller decides which (keyHash, threshold) they required; those are
-     * emitted so an off-chain verifier can confirm they match its request.
      */
     function verifyRangeProof(
         uint256 certificateId,
@@ -222,6 +231,35 @@ contract CertifyRegistry is AccessControl {
         uint[2] calldata c,
         uint[3] calldata pubSignals
     ) external returns (bool) {
+        return _verify(PREDICATE_RANGE, certificateId, a, b, c, pubSignals);
+    }
+
+    /**
+     * @notice Verify a Groth16 EQUALITY proof: the claim `pubSignals[1]`
+     *         (keyHash) equals `pubSignals[2]` (value) in this certificate.
+     * @param pubSignals [0]=root, [1]=keyHash, [2]=value.
+     */
+    function verifyEqualityProof(
+        uint256 certificateId,
+        uint[2] calldata a,
+        uint[2][2] calldata b,
+        uint[2] calldata c,
+        uint[3] calldata pubSignals
+    ) external returns (bool) {
+        return _verify(PREDICATE_EQUALITY, certificateId, a, b, c, pubSignals);
+    }
+
+    function _verify(
+        bytes32 predicateId,
+        uint256 certificateId,
+        uint[2] calldata a,
+        uint[2][2] calldata b,
+        uint[2] calldata c,
+        uint[3] calldata pubSignals
+    ) internal returns (bool) {
+        IGroth16Verifier verifier = verifiers[predicateId];
+        require(address(verifier) != address(0), "unknown predicate");
+
         Certificate memory cert = certificates[certificateId];
         require(cert.status == CertificateStatus.Active, "inactive cert");
 
@@ -230,13 +268,13 @@ contract CertifyRegistry is AccessControl {
         require(bytes32(pubSignals[0]) == cert.metadataCommitment, "commitment mismatch");
 
         // Replay protection: a given proof is single-use.
-        bytes32 proofHash = keccak256(abi.encode(a, b, c, pubSignals));
+        bytes32 proofHash = keccak256(abi.encode(predicateId, a, b, c, pubSignals));
         require(!usedProofs[proofHash], "proof already used");
 
-        require(zkVerifier.verifyProof(a, b, c, pubSignals), "invalid proof");
+        require(verifier.verifyProof(a, b, c, pubSignals), "invalid proof");
 
         usedProofs[proofHash] = true;
-        emit ZKVerified(certificateId, msg.sender, pubSignals[1], pubSignals[2]);
+        emit ZKVerified(certificateId, msg.sender, predicateId, pubSignals[1], pubSignals[2]);
         return true;
     }
 }

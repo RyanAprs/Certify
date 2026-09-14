@@ -20,10 +20,10 @@ export const N_LEAVES = 1 << MERKLE_DEPTH;
 const FIELD_ORDER =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
-/** Pack a short claim key (utf-8, ≤31 bytes) into a field element. */
-export function encodeKey(key: string): bigint {
-  const bytes = new TextEncoder().encode(key);
-  if (bytes.length > 31) throw new Error(`Claim key too long: ${key}`);
+/** Pack a short string (utf-8, ≤31 bytes) into a field element. */
+export function packString(s: string): bigint {
+  const bytes = new TextEncoder().encode(s);
+  if (bytes.length > 31) throw new Error(`String too long to pack: "${s}"`);
   let v = 0n;
   for (const b of bytes) v = (v << 8n) | BigInt(b);
   return v % FIELD_ORDER;
@@ -31,7 +31,7 @@ export function encodeKey(key: string): bigint {
 
 /** Stable field-element identifier for a claim key. */
 export function keyHash(key: string): bigint {
-  return poseidon1([encodeKey(key)]);
+  return poseidon1([packString(key)]);
 }
 
 export function leafHash(kHash: bigint, value: bigint, salt: bigint): bigint {
