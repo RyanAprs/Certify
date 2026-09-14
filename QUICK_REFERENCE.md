@@ -62,7 +62,7 @@ npm run dev
 **Terminal 1 (where blockchain is running):**
 ```bash
 cd contracts
-npx hardhat run scripts/deploy.ts --network localhost
+npm run deploy:local
 ```
 
 Copy the 3 contract addresses output.
@@ -72,7 +72,7 @@ Copy the 3 contract addresses output.
 Edit `frontend/.env`:
 ```env
 VITE_CONTRACT_ADDRESS=0x9fE46...    # From deploy output
-VITE_VERIFIER_ADDRESS=0x5FbDB...    # From deploy output
+# addresses come from deployment.json (written by deploy)
 ```
 
 Refresh frontend at http://localhost:5173
@@ -125,13 +125,13 @@ After deploying, save these:
 
 ```
 Groth16 Verifier:   0x5FbDB2315678afccb333f8a9c45ead413b7c77bf
-ZKPCertify:         0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+CertifyRegistry:    0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 CertifyRegistry:    0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
 ```
 
 Use in `frontend/.env`:
 - `VITE_CONTRACT_ADDRESS` = CertifyRegistry
-- `VITE_VERIFIER_ADDRESS` = Groth16 Verifier
+- addresses are auto-written to `frontend/src/lib/deployment.json`
 
 ---
 
@@ -171,7 +171,7 @@ Certify/
 |-------|-----|
 | `port 8545 already in use` | `lsof -ti:8545 \| xargs kill -9` |
 | `cannot find module hardhat` | `npm install --legacy-peer-deps` |
-| `contract address undefined` | Deploy again: `npx hardhat run scripts/deploy.ts --network localhost` |
+| `contract address undefined` | Deploy again: `npm run deploy:local` |
 | `proof verification fails` | Ensure ZK files in `frontend/public/zk/` |
 | `SIWE login fails` | Check backend running; clear cookies |
 | `MetaMask connection error` | Check RPC URL; reset account |
