@@ -2,4 +2,5 @@
 /* tslint:disable */
 /* eslint-disable */
 export { EqualityVerifier__factory } from "./EqualityVerifier__factory";
+export { MembershipVerifier__factory } from "./MembershipVerifier__factory";
 export { RangeVerifier__factory } from "./RangeVerifier__factory";

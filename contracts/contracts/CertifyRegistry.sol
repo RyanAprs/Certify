@@ -64,6 +64,7 @@ contract CertifyRegistry is AccessControl {
     // different verification key). Routed via the registry below.
     bytes32 public constant PREDICATE_RANGE = keccak256("range");
     bytes32 public constant PREDICATE_EQUALITY = keccak256("equality");
+    bytes32 public constant PREDICATE_MEMBERSHIP = keccak256("membership");
 
     mapping(bytes32 predicateId => IGroth16Verifier) public verifiers;
     uint256 private _certificateIdTracker;
@@ -255,6 +256,22 @@ contract CertifyRegistry is AccessControl {
         uint[3] calldata pubSignals
     ) external returns (bool) {
         return _verify(PREDICATE_EQUALITY, certificateId, a, b, c, pubSignals);
+    }
+
+    /**
+     * @notice Verify a Groth16 SET-MEMBERSHIP proof: the claim `pubSignals[1]`
+     *         (keyHash) is one of the values in the set committed by
+     *         `pubSignals[2]` (setRoot) — without revealing which one.
+     * @param pubSignals [0]=root, [1]=keyHash, [2]=setRoot.
+     */
+    function verifyMembershipProof(
+        uint256 certificateId,
+        uint[2] calldata a,
+        uint[2][2] calldata b,
+        uint[2] calldata c,
+        uint[3] calldata pubSignals
+    ) external returns (bool) {
+        return _verify(PREDICATE_MEMBERSHIP, certificateId, a, b, c, pubSignals);
     }
 
     function _verify(

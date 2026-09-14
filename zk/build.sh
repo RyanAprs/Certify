@@ -70,7 +70,7 @@ build_circuit() {
   echo "→ ${Name}Verifier.sol + ${c}.wasm/zkey/vkey published"
 }
 
-for circuit in range equality; do
+for circuit in range equality membership; do
   build_circuit "$circuit"
 done
 

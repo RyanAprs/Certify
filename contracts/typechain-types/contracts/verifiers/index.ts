@@ -2,4 +2,5 @@
 /* tslint:disable */
 /* eslint-disable */
 export type { EqualityVerifier } from "./EqualityVerifier";
+export type { MembershipVerifier } from "./MembershipVerifier";
 export type { RangeVerifier } from "./RangeVerifier";

@@ -20,6 +20,12 @@ async function main() {
   const equalityAddress = await equalityVerifier.getAddress();
   console.log("EqualityVerifier:", equalityAddress);
 
+  const Membership = await ethers.getContractFactory("MembershipVerifier");
+  const membershipVerifier = await Membership.deploy();
+  await membershipVerifier.waitForDeployment();
+  const membershipAddress = await membershipVerifier.getAddress();
+  console.log("MembershipVerifier:", membershipAddress);
+
   // 2. CertifyRegistry (range verifier in the constructor, equality registered after).
   const Registry = await ethers.getContractFactory("CertifyRegistry");
   const registry = await Registry.deploy(deployer.address, rangeAddress);
@@ -29,7 +35,9 @@ async function main() {
 
   const PREDICATE_EQUALITY = await registry.PREDICATE_EQUALITY();
   await (await registry.setVerifier(PREDICATE_EQUALITY, equalityAddress)).wait();
-  console.log("Registered EqualityVerifier");
+  const PREDICATE_MEMBERSHIP = await registry.PREDICATE_MEMBERSHIP();
+  await (await registry.setVerifier(PREDICATE_MEMBERSHIP, membershipAddress)).wait();
+  console.log("Registered Equality + Membership verifiers");
 
   const deployTx = registry.deploymentTransaction();
   const deploymentBlock = deployTx
@@ -44,6 +52,7 @@ async function main() {
     registry: registryAddress,
     rangeVerifier: rangeAddress,
     equalityVerifier: equalityAddress,
+    membershipVerifier: membershipAddress,
     deploymentBlock,
   };
 

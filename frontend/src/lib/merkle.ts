@@ -102,17 +102,61 @@ export interface MerklePath {
   pathIndices: number[]; // 0 = current is left, 1 = current is right
 }
 
-/** Sibling path for the leaf at `leafIndex`. */
-export function merklePath(layers: bigint[][], leafIndex: number): MerklePath {
+function pathAt(layers: bigint[][], leafIndex: number, depth: number): MerklePath {
   const pathElements: bigint[] = [];
   const pathIndices: number[] = [];
   let idx = leafIndex;
-  for (let level = 0; level < MERKLE_DEPTH; level++) {
+  for (let level = 0; level < depth; level++) {
     const isRight = idx & 1;
-    const siblingIdx = isRight ? idx - 1 : idx + 1;
-    pathElements.push(layers[level][siblingIdx]);
+    pathElements.push(layers[level][isRight ? idx - 1 : idx + 1]);
     pathIndices.push(isRight);
     idx >>= 1;
   }
   return { pathElements, pathIndices };
+}
+
+/** Sibling path for the credential-tree leaf at `leafIndex`. */
+export function merklePath(layers: bigint[][], leafIndex: number): MerklePath {
+  return pathAt(layers, leafIndex, MERKLE_DEPTH);
+}
+
+/* ---------------- Set membership (allowed-value set) ---------------- */
+
+export const SET_DEPTH = 3; // up to 2^3 = 8 allowed values
+export const SET_LEAVES = 1 << SET_DEPTH;
+
+export interface SetTree {
+  root: bigint;
+  layers: bigint[][];
+  indexOf: (value: bigint) => number;
+}
+
+/**
+ * Build a Merkle tree over an allowed value set (leaf = the value itself, node
+ * = Poseidon(left, right)) — matches membership.circom's set inclusion. Unused
+ * slots are padded with the last real value, so padding is always a real member.
+ */
+export function buildSetTree(values: bigint[]): SetTree {
+  if (values.length === 0) throw new Error("Allowed set is empty");
+  if (values.length > SET_LEAVES) throw new Error(`Allowed set too large (max ${SET_LEAVES})`);
+  const leaves = new Array<bigint>(SET_LEAVES);
+  for (let i = 0; i < SET_LEAVES; i++) leaves[i] = values[i] ?? values[values.length - 1];
+
+  const layers: bigint[][] = [leaves];
+  let cur = leaves;
+  while (cur.length > 1) {
+    const next: bigint[] = [];
+    for (let i = 0; i < cur.length; i += 2) next.push(poseidon2([cur[i], cur[i + 1]]));
+    layers.push(next);
+    cur = next;
+  }
+  return {
+    root: layers[layers.length - 1][0],
+    layers,
+    indexOf: (value) => leaves.findIndex((x) => x === value),
+  };
+}
+
+export function setMerklePath(layers: bigint[][], leafIndex: number): MerklePath {
+  return pathAt(layers, leafIndex, SET_DEPTH);
 }

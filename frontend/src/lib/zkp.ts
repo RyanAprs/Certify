@@ -1,5 +1,13 @@
 import { groth16 } from "snarkjs";
-import { buildClaimTree, keyHash, merklePath, randomSalt, ClaimInput } from "./merkle";
+import {
+  buildClaimTree,
+  keyHash,
+  merklePath,
+  randomSalt,
+  buildSetTree,
+  setMerklePath,
+  ClaimInput,
+} from "./merkle";
 import { Schema, ClaimField, encodeClaimValue, Predicate } from "./schemas";
 
 /**
@@ -126,6 +134,40 @@ export async function generateEqualityProof(
   });
 }
 
+/** Prove claim value ∈ {allowed set}, without revealing which element it is. */
+export async function generateMembershipProof(
+  schema: Schema,
+  meta: CredentialMetadata,
+  claimKey: string,
+  allowedValuesRaw: (number | string)[]
+): Promise<ZKProof> {
+  const field = fieldFor(schema, claimKey);
+  const value = encodeClaimValue(field, meta.claims[claimKey]);
+  const allowed = allowedValuesRaw
+    .filter((v) => v !== "" && v !== null && v !== undefined)
+    .map((v) => encodeClaimValue(field, v));
+  if (allowed.length === 0) throw new Error("Provide at least one allowed value");
+
+  const setTree = buildSetTree(allowed);
+  const setIndex = setTree.indexOf(value);
+  if (setIndex < 0) {
+    throw new Error("This credential's value is not in the allowed set");
+  }
+  const setPath = setMerklePath(setTree.layers, setIndex);
+  const cred = pathFor(schema, meta, claimKey);
+
+  return prove("membership", {
+    value: value.toString(),
+    salt: cred.salt,
+    keyHash: keyHash(claimKey).toString(),
+    setRoot: setTree.root.toString(),
+    credPathElements: cred.pathElements.map((x) => x.toString()),
+    credPathIndices: cred.pathIndices,
+    setPathElements: setPath.pathElements.map((x) => x.toString()),
+    setPathIndices: setPath.pathIndices,
+  });
+}
+
 /** Verify a proof locally against the predicate's verification key. */
 export async function verifyProof(zkProof: ZKProof, predicate: Predicate): Promise<boolean> {
   const vKey = await (await fetch(`/zk/${predicate}.vkey.json`)).json();
@@ -158,13 +200,16 @@ export async function validateZkFiles(): Promise<{ wasm: boolean; zkey: boolean;
       return false;
     }
   };
-  const [rw, rz, rv, ew, ez, ev] = await Promise.all([
+  const [rw, rz, rv, ew, ez, ev, mw, mz, mv] = await Promise.all([
     check("/zk/range.wasm"),
     check("/zk/range.zkey"),
     check("/zk/range.vkey.json"),
     check("/zk/equality.wasm"),
     check("/zk/equality.zkey"),
     check("/zk/equality.vkey.json"),
+    check("/zk/membership.wasm"),
+    check("/zk/membership.zkey"),
+    check("/zk/membership.vkey.json"),
   ]);
-  return { wasm: rw && ew, zkey: rz && ez, vkey: rv && ev };
+  return { wasm: rw && ew && mw, zkey: rz && ez && mz, vkey: rv && ev && mv };
 }

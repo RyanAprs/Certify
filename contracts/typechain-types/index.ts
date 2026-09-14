@@ -22,5 +22,7 @@ export type { MockGroth16Verifier } from "./contracts/mocks/MockGroth16Verifier"
 export { MockGroth16Verifier__factory } from "./factories/contracts/mocks/MockGroth16Verifier__factory";
 export type { EqualityVerifier } from "./contracts/verifiers/EqualityVerifier";
 export { EqualityVerifier__factory } from "./factories/contracts/verifiers/EqualityVerifier__factory";
+export type { MembershipVerifier } from "./contracts/verifiers/MembershipVerifier";
+export { MembershipVerifier__factory } from "./factories/contracts/verifiers/MembershipVerifier__factory";
 export type { RangeVerifier } from "./contracts/verifiers/RangeVerifier";
 export { RangeVerifier__factory } from "./factories/contracts/verifiers/RangeVerifier__factory";

@@ -13,7 +13,7 @@ import { packString } from "./merkle";
  */
 
 export type ClaimKind = "number" | "string" | "timestamp";
-export type Predicate = "range" | "equality";
+export type Predicate = "range" | "equality" | "membership";
 
 export interface ClaimField {
   key: string;
@@ -81,7 +81,7 @@ export const SCHEMAS: Schema[] = [
     claims: [
       { key: "score", label: "Assessment score", kind: "number", predicates: ["range"], min: 0, max: 100, step: 1, scale: 1, unit: "/100" },
       { key: "level", label: "Attained level", kind: "number", predicates: ["range", "equality"], min: 1, max: 5, step: 1, scale: 1 },
-      { key: "skill", label: "Skill", kind: "string", predicates: ["equality"] },
+      { key: "skill", label: "Skill", kind: "string", predicates: ["equality", "membership"] },
     ],
   },
   {
@@ -95,7 +95,7 @@ export const SCHEMAS: Schema[] = [
       { key: "program", label: "License type", type: "text", required: true, placeholder: "Structural Welding" },
     ],
     claims: [
-      { key: "authority", label: "Issuing authority", kind: "string", predicates: ["equality"] },
+      { key: "authority", label: "Issuing authority", kind: "string", predicates: ["equality", "membership"] },
       { key: "level", label: "Grade / class", kind: "number", predicates: ["range", "equality"], min: 1, max: 10, step: 1, scale: 1 },
       { key: "validUntil", label: "Valid until", kind: "timestamp", predicates: ["range"] },
     ],

@@ -53,6 +53,7 @@ export interface CertifyRegistryInterface extends Interface {
       | "DEFAULT_ADMIN_ROLE"
       | "ISSUER_ADMIN_ROLE"
       | "PREDICATE_EQUALITY"
+      | "PREDICATE_MEMBERSHIP"
       | "PREDICATE_RANGE"
       | "certificates"
       | "getDisclosures"
@@ -77,6 +78,7 @@ export interface CertifyRegistryInterface extends Interface {
       | "usedProofs"
       | "verifiers"
       | "verifyEqualityProof"
+      | "verifyMembershipProof"
       | "verifyRangeProof"
   ): FunctionFragment;
 
@@ -106,6 +108,10 @@ export interface CertifyRegistryInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "PREDICATE_EQUALITY",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "PREDICATE_MEMBERSHIP",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -211,6 +217,16 @@ export interface CertifyRegistryInterface extends Interface {
     ]
   ): string;
   encodeFunctionData(
+    functionFragment: "verifyMembershipProof",
+    values: [
+      BigNumberish,
+      [BigNumberish, BigNumberish],
+      [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      [BigNumberish, BigNumberish],
+      [BigNumberish, BigNumberish, BigNumberish]
+    ]
+  ): string;
+  encodeFunctionData(
     functionFragment: "verifyRangeProof",
     values: [
       BigNumberish,
@@ -231,6 +247,10 @@ export interface CertifyRegistryInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "PREDICATE_EQUALITY",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "PREDICATE_MEMBERSHIP",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -312,6 +332,10 @@ export interface CertifyRegistryInterface extends Interface {
   decodeFunctionResult(functionFragment: "verifiers", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "verifyEqualityProof",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "verifyMembershipProof",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -591,6 +615,8 @@ export interface CertifyRegistry extends BaseContract {
 
   PREDICATE_EQUALITY: TypedContractMethod<[], [string], "view">;
 
+  PREDICATE_MEMBERSHIP: TypedContractMethod<[], [string], "view">;
+
   PREDICATE_RANGE: TypedContractMethod<[], [string], "view">;
 
   certificates: TypedContractMethod<
@@ -752,6 +778,18 @@ export interface CertifyRegistry extends BaseContract {
     "nonpayable"
   >;
 
+  verifyMembershipProof: TypedContractMethod<
+    [
+      certificateId: BigNumberish,
+      a: [BigNumberish, BigNumberish],
+      b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      c: [BigNumberish, BigNumberish],
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
+    ],
+    [boolean],
+    "nonpayable"
+  >;
+
   verifyRangeProof: TypedContractMethod<
     [
       certificateId: BigNumberish,
@@ -776,6 +814,9 @@ export interface CertifyRegistry extends BaseContract {
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "PREDICATE_EQUALITY"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "PREDICATE_MEMBERSHIP"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "PREDICATE_RANGE"
@@ -923,6 +964,19 @@ export interface CertifyRegistry extends BaseContract {
   ): TypedContractMethod<[predicateId: BytesLike], [string], "view">;
   getFunction(
     nameOrSignature: "verifyEqualityProof"
+  ): TypedContractMethod<
+    [
+      certificateId: BigNumberish,
+      a: [BigNumberish, BigNumberish],
+      b: [[BigNumberish, BigNumberish], [BigNumberish, BigNumberish]],
+      c: [BigNumberish, BigNumberish],
+      pubSignals: [BigNumberish, BigNumberish, BigNumberish]
+    ],
+    [boolean],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "verifyMembershipProof"
   ): TypedContractMethod<
     [
       certificateId: BigNumberish,

@@ -25,8 +25,9 @@ describe("CertifyRegistry", () => {
     )) as CertifyRegistry;
     await registry.waitForDeployment();
 
-    // Register the same mock as the equality verifier too.
+    // Register the same mock as the equality + membership verifiers too.
     await registry.setVerifier(await registry.PREDICATE_EQUALITY(), await mock.getAddress());
+    await registry.setVerifier(await registry.PREDICATE_MEMBERSHIP(), await mock.getAddress());
 
     return { admin, holder, verifier, mock, registry };
   }
@@ -150,6 +151,22 @@ describe("CertifyRegistry", () => {
     )
       .to.emit(registry, "ZKVerified")
       .withArgs(ids[0], verifier.address, ethers.id("equality"), KEY_HASH, 42n);
+  });
+
+  it("verifies a membership proof via the registered membership verifier", async () => {
+    const { admin, holder, verifier, registry } = await deploy();
+    const commitment = ethers.zeroPadValue("0xcafe", 32);
+    await issueTo(registry, admin, holder, commitment);
+    const ids = await registry.getHolderCertificates(holder.address);
+
+    const pub: [bigint, bigint, bigint] = [BigInt(commitment), KEY_HASH, 999n]; // [root, keyHash, setRoot]
+    await expect(
+      registry
+        .connect(verifier)
+        .verifyMembershipProof(ids[0], DUMMY_A, DUMMY_B, DUMMY_C, pub)
+    )
+      .to.emit(registry, "ZKVerified")
+      .withArgs(ids[0], verifier.address, ethers.id("membership"), KEY_HASH, 999n);
   });
 
   it("rejects a predicate with no registered verifier", async () => {

@@ -14,6 +14,7 @@ import { getSchema, Schema, Predicate } from "../lib/schemas";
 import {
   generateRangeProof,
   generateEqualityProof,
+  generateMembershipProof,
   verifyProof,
   formatProofForSolidity,
   validateZkFiles,
@@ -38,6 +39,7 @@ function toStatus(n: number): CertificateStatus {
 const PREDICATE_LABEL: Record<Predicate, string> = {
   range: "Threshold ≥",
   equality: "Equals",
+  membership: "One of",
 };
 
 export const VerifierDashboard = () => {
@@ -53,6 +55,7 @@ export const VerifierDashboard = () => {
   const [predicate, setPredicate] = useState<Predicate>("range");
   const [threshold, setThreshold] = useState("");
   const [eqValue, setEqValue] = useState("");
+  const [setValues, setSetValues] = useState("");
 
   const [zkProof, setZkProof] = useState<{ proof: ZKProof; predicate: Predicate } | null>(null);
   const [localVerified, setLocalVerified] = useState<boolean | null>(null);
@@ -80,6 +83,7 @@ export const VerifierDashboard = () => {
     setZkProof(null);
     setThreshold("");
     setEqValue("");
+    setSetValues("");
     const f = schema?.claims.find((c) => c.key === key);
     setPredicate(f?.predicates[0] ?? "range");
   }
@@ -116,6 +120,7 @@ export const VerifierDashboard = () => {
       setPredicate(firstClaim?.predicates[0] ?? "range");
       setThreshold("");
       setEqValue("");
+      setSetValues("");
       if (found.metadataCid) {
         try {
           setMetadata(await fetchFromIpfs<CredentialMetadata>(found.metadataCid));
@@ -139,7 +144,15 @@ export const VerifierDashboard = () => {
     setLocalVerified(null);
     try {
       let proof: ZKProof;
-      if (predicate === "equality") {
+      if (predicate === "membership") {
+        const list = setValues
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((v) => (claimField.kind === "number" ? parseFloat(v) : v));
+        if (list.length === 0) throw new Error("Enter allowed values (comma-separated)");
+        proof = await generateMembershipProof(schema, metadata, claimKey, list);
+      } else if (predicate === "equality") {
         const v = claimField.kind === "number" ? parseFloat(eqValue) : eqValue;
         if (v === "" || (typeof v === "number" && isNaN(v))) throw new Error("Enter a value to match");
         proof = await generateEqualityProof(schema, metadata, claimKey, v);
@@ -163,7 +176,12 @@ export const VerifierDashboard = () => {
     setIsVerifying(true);
     try {
       const { a, b, c, pubSignals } = formatProofForSolidity(zkProof.proof);
-      const fn = zkProof.predicate === "equality" ? "verifyEqualityProof" : "verifyRangeProof";
+      const fn =
+        zkProof.predicate === "equality"
+          ? "verifyEqualityProof"
+          : zkProof.predicate === "membership"
+          ? "verifyMembershipProof"
+          : "verifyRangeProof";
       await write(fn, [cert.id, a, b, c, pubSignals], {
         pending: "Verifying proof on-chain…",
         success: "Proof verified on-chain",
@@ -311,6 +329,19 @@ export const VerifierDashboard = () => {
               <p className="text-sm text-ink-muted">
                 Proves <strong>{claimField.label}</strong> ≥ now — i.e. the credential is not expired.
               </p>
+            ) : predicate === "membership" ? (
+              <Field
+                label={`${claimField.label} is one of`}
+                hint="Comma-separated (max 8) — which one matched stays hidden"
+              >
+                <input
+                  className="input"
+                  type="text"
+                  value={setValues}
+                  onChange={(e) => setSetValues(e.target.value)}
+                  placeholder={claimField.kind === "string" ? "e.g. BNSP, LSP, KAN" : "e.g. 3, 4, 5"}
+                />
+              </Field>
             ) : predicate === "equality" ? (
               <Field label={`${claimField.label} equals`} hint="Revealed to the verifier; other claims stay hidden">
                 <input

@@ -46,6 +46,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.EqualityVerifier__factory>;
     getContractFactory(
+      name: "MembershipVerifier",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.MembershipVerifier__factory>;
+    getContractFactory(
       name: "RangeVerifier",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.RangeVerifier__factory>;
@@ -91,6 +95,11 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.EqualityVerifier>;
     getContractAt(
+      name: "MembershipVerifier",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.MembershipVerifier>;
+    getContractAt(
       name: "RangeVerifier",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
@@ -129,6 +138,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.EqualityVerifier>;
     deployContract(
+      name: "MembershipVerifier",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.MembershipVerifier>;
+    deployContract(
       name: "RangeVerifier",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.RangeVerifier>;
@@ -173,6 +186,11 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.EqualityVerifier>;
+    deployContract(
+      name: "MembershipVerifier",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.MembershipVerifier>;
     deployContract(
       name: "RangeVerifier",
       args: any[],
