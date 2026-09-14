@@ -19,7 +19,7 @@ npm run dev            # install → node → deploy → backend → frontend (C
 ```
 Then add the Hardhat network to MetaMask (below) and import Account #0. Done.
 
-For ZK on-chain verify: `npm run zk:build` (needs circom v2 + ptau-14), then `npm run dev` again.
+For ZK on-chain verify: `npm run zk:build` (needs circom v2; ptau auto-generated), then `FORCE_DEPLOY=1 npm run dev`.
 
 ---
 
@@ -106,9 +106,9 @@ cd contracts
 npx hardhat test
 ```
 
-### Rebuild Circuit (range predicate)
+### Rebuild ZK circuits (range / equality / membership)
 ```bash
-npm run zk:build          # = cd zk && ./build.sh (needs circom v2 + ptau-14)
+npm run zk:build          # builds 3 circuits (needs circom v2; ptau auto-generated)
 ```
 
 ### View Contract ABI

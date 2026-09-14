@@ -24,11 +24,11 @@ npm run dev            # buka http://localhost:5173
 
 Lalu di MetaMask: tambah network RPC `http://127.0.0.1:8545`, Chain ID `31337`, dan import Account #0 dari output `[chain]` (admin/issuer default).
 
-**(Opsional) aktifkan verifikasi ZK on-chain** — butuh `circom` v2 + powers-of-tau power-14:
+**(Opsional) aktifkan verifikasi ZK on-chain** — hanya butuh `circom` v2 (powers-of-tau di-generate otomatis oleh build):
 
 ```bash
-npm run zk:build       # compile range.circom → range.wasm/zkey + verifier.sol
-npm run dev            # deploy ulang otomatis pakai verifier asli
+npm run zk:build            # build 3 circuits → range/equality/membership + verifiers
+FORCE_DEPLOY=1 npm run dev  # deploy ulang pakai verifier asli
 ```
 
 > Tanpa `zk:build`, semua alur jalan; hanya tombol **"Verify on-chain"** yang nonaktif
@@ -51,15 +51,20 @@ Certify
 
 ## ✨ Fitur Utama
 
-**Multi-jenis kredensial** (schema-driven). Bawaan: `diploma.v1` (klaim GPA) dan
-`competency.v1` (klaim score/level). Menambah jenis numerik baru cukup menambah
-schema di `frontend/src/lib/schemas.ts` — tanpa circuit baru.
+**Multi-jenis kredensial** (schema-driven). Bawaan: `diploma.v1` (GPA),
+`competency.v1` (score/level/skill), `license.v1` (authority/level/validUntil).
+Menambah jenis baru cukup menambah schema di `frontend/src/lib/schemas.ts`.
+
+**3 predikat selective-disclosure** (tiap klaim bisa memilih mana yang boleh dibuktikan):
+- **range** — `nilai ≥ threshold` (juga expiry: `validUntil ≥ now`)
+- **equality** — `nilai == X` (mendukung string, mis. "authority == BNSP")
+- **membership** — `nilai ∈ {A, B, C}` tanpa ungkap yang mana
 
 ### Issuer (Penerbit)
-- ✅ Register institusi penerbit
-- ✅ Manage membership requests (approve/reject holders)
+- ✅ **Admin**: register / remove issuer dari web (panel admin)
+- ✅ Approve/reject permohonan membership holder
 - ✅ Pilih jenis kredensial → form dinamis dari schema; issue dengan image IPFS
-- ✅ View issued credentials on-chain; ubah status (Active/Revoked)
+- ✅ **Revoke / Reactivate** sertifikat langsung dari kartu
 
 ### Holder (Penerima)
 - ✅ Request membership ke issuer
@@ -68,14 +73,14 @@ schema di `frontend/src/lib/schemas.ts` — tanpa circuit baru.
 
 ### Verifier (Pemverifikasi)
 - ✅ Search credential by ID
-- ✅ Presentation request: pilih klaim + threshold
-- ✅ Verify Groth16 range proof on-chain (nilai tetap privat)
+- ✅ Presentation request: pilih **klaim + predikat** (threshold / equals / one-of / not-expired)
+- ✅ Verify Groth16 proof on-chain (nilai tetap privat)
 - ✅ See disclosure history
 
 ### Security & Privacy
 - ✅ **Wallet Auth** - Connect via RainbowKit; on-chain roles enforce access
-- ✅ **ZKP Range Proof** - Buktikan `nilai_klaim >= threshold` tanpa reveal nilai (range check dienforce di circuit)
-- ✅ **Immutable Verifier** - Alamat verifier di-set di constructor, tidak bisa di-swap
+- ✅ **3 ZK Predicates** - range/equality/membership; semua constraint dienforce di circuit
+- ✅ **Verifier Registry** - `predicateId → verifier`; tiap circuit punya verifier sendiri
 - ✅ **Proof Replay Protection** - Setiap proof single-use (`usedProofs` hash tracking)
 - ✅ **Merkle Commitment** - `metadataCommitment` = Merkle root dari klaim; proof terikat ke root
 - ✅ **Blinding Salt** - Field element acak per klaim
@@ -97,44 +102,46 @@ schema di `frontend/src/lib/schemas.ts` — tanpa circuit baru.
 Satu registry (bukan dua — `ZKPCertify` lama sudah dihapus):
 
 ```
-Groth16Verifier (di-generate snarkjs dari range.circom)
-  └─ verifyProof(a, b, c, [root, keyHash, threshold]) → validasi proof
+RangeVerifier / EqualityVerifier / MembershipVerifier
+  └─ verifyProof(a, b, c, uint[3]) → validasi Groth16 per circuit
 
 CertifyRegistry (registry tunggal)
-  ├─ Issuer management (AccessControl: ISSUER_ADMIN_ROLE)
+  ├─ Issuer management (AccessControl: DEFAULT_ADMIN_ROLE, ISSUER_ADMIN_ROLE)
+  │    · registerIssuer / removeIssuer (admin)
   ├─ Membership approval flow
-  ├─ Certificate lifecycle (Active/Pending/Revoked) + schemaId (jenis kredensial)
+  ├─ Certificate lifecycle (Active/Pending/Revoked) + schemaId
   ├─ Selective disclosure tracking
-  └─ verifyRangeProof() → root binding + replay protection
+  ├─ Verifier registry: mapping(predicateId → verifier), setVerifier (admin)
+  └─ verifyRange / verifyEquality / verifyMembership → root binding + replay
 ```
 
 ### Contract Addresses
 
 Setelah deploy, script menulis alamat + ABI otomatis ke
 `frontend/src/lib/deployment.json` dan `CertifyRegistry.abi.json` — **tidak perlu
-copy-paste manual**. Di localhost (deployer default Hardhat) alamatnya deterministik:
+copy-paste manual**. `deployment.json` memuat `registry` + `rangeVerifier` +
+`equalityVerifier` + `membershipVerifier` + `deploymentBlock`.
 
-```
-Groth16Verifier:   0x5FbDB2315678afccb333f8a9c45ead413b7c77bf
-CertifyRegistry:   0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-```
-
-> Alamat sudah tersedia untuk frontend lewat `deployment.json`. `VITE_CONTRACT_ADDRESS`
-> hanya diperlukan sebagai override manual.
+> `VITE_CONTRACT_ADDRESS` hanya diperlukan sebagai override manual.
 
 ### Key Contract Functions
 
+**Admin:**
+- `registerIssuer(addr)` / `removeIssuer(addr)` - Authorize/revoke an issuer
+- `setVerifier(predicateId, addr)` - Register a predicate's Groth16 verifier
+
 **Issuer:**
-- `requestMembership(issuer)` - Holder requests to join
-- `manageMember(holder, approve)` - Issuer approves/rejects
-- `issueCertificate(holder, metadataCid, commitment, schemaId)` - Issue credential (commitment = Merkle root)
+- `requestMembership(issuer)` / `manageMember(holder, approve)` - Membership flow
+- `issueCertificate(holder, metadataCid, commitment, schemaId)` - Issue (commitment = Merkle root)
+- `setCertificateStatus(certId, status)` - Revoke/reactivate (0=Pending,1=Active,2=Revoked)
 
 **Holder:**
 - `shareCertificate(certId, verifier, queryHash, encPayload)` - Share with verifier
 
-**Verifier:**
-- `verifyRangeProof(certId, a, b, c, pubSignals)` - Verify Groth16 range proof on-chain
-  (`pubSignals = [root, keyHash, threshold]`; root harus cocok dengan `cert.metadataCommitment`)
+**Verifier (all take `pubSignals = uint[3]`, `pubSignals[0]` must equal the Merkle root):**
+- `verifyRangeProof(certId, a, b, c, [root, keyHash, threshold])`
+- `verifyEqualityProof(certId, a, b, c, [root, keyHash, value])`
+- `verifyMembershipProof(certId, a, b, c, [root, keyHash, setRoot])`
 
 **Getter:**
 - `certificates(certId)` - Certificate struct (id, issuer, holder, cid, commitment, status, issuedAt, schemaId)
@@ -200,16 +207,16 @@ VITE_WALLETCONNECT_ID=            # opsional (mobile wallets)
 ### ZKP Proof Generation Flow
 
 ```
-1. Verifier/Holder cari credential → fetch dari blockchain (termasuk schemaId)
+1. Verifier cari credential → fetch dari blockchain (termasuk schemaId)
 2. Metadata dari IPFS (via metadataCid) — berisi claims + salts
-3. Pilih klaim (mis. gpa/score/level) + threshold, lalu bangun input circuit:
-   - value, salt, Merkle pathElements/pathIndices   (private)
-   - keyHash, threshold                              (public)
-4. Generate proof dengan range.wasm + range.zkey (snarkjs Groth16)
-5. Public signals: [root, keyHash, threshold]   (root = Merkle root klaim)
-6. Submit ke CertifyRegistry.verifyRangeProof(certId, a, b, c, pubSignals)
-7. Kontrak cek root == cert.metadataCommitment, cek replay, verifikasi
-   Groth16 → emit ZKVerified(certId, verifier, keyHash, threshold)
+3. Pilih klaim + PREDIKAT (threshold / equals / one-of / not-expired) → bangun input:
+   - value, salt, Merkle path                        (private)
+   - keyHash, param (threshold | value | setRoot)    (public)
+4. Generate proof dengan <predicate>.wasm + .zkey (snarkjs Groth16)
+5. Public signals: [root, keyHash, param]   (root = Merkle root klaim)
+6. Submit ke verify{Range|Equality|Membership}Proof(certId, a, b, c, pubSignals)
+7. Kontrak pilih verifier via registry, cek root == cert.metadataCommitment,
+   cek replay, verifikasi Groth16 → emit ZKVerified(certId, verifier, predicateId, keyHash, param)
 ```
 
 ### IPFS Integration
@@ -257,9 +264,9 @@ Selective Disclosure:
 
 ### Zero-Knowledge Proofs
 - ✅ **Groth16** - Industry-standard, fast verification
-- ✅ **Enforced Range** - `GreaterEqThan` meng-enforce `value >= threshold` di circuit (bug lama: dulu tidak di-cek sama sekali)
+- ✅ **3 Predicates** - range (`GreaterEqThan`), equality & membership (Merkle inclusion) — semua constraint dienforce di circuit
 - ✅ **Poseidon Commitment** - Hash yang collision-resistant & binding di dalam circuit
-- ✅ **Commitment Binding** - Proof terikat ke `cert.metadataCommitment` on-chain
+- ✅ **Commitment Binding** - `pubSignals[0]` (Merkle root) harus == `cert.metadataCommitment`
 - ✅ **Replay Protection** - `usedProofs[proofHash]` menolak proof yang sama dua kali
 
 ### Authentication
@@ -363,11 +370,11 @@ npx hardhat run scripts/deploy.ts --network sepolia
 - Check RPC URL in MetaMask: `http://127.0.0.1:8545`
 
 **Q: ZKP proof generation fails / Verifier page shows "ZK artifacts missing"**
-- Run `cd zk && ./build.sh` to generate `range.wasm`/`range.zkey` into `frontend/public/zk/`
+- Run `npm run zk:build` to build the 3 circuits into `frontend/public/zk/` (auto-generates powers-of-tau, no download)
 - Requires `circom` v2 installed
 
 **Q: On-chain verify always reverts "invalid proof"**
-- The deployed verifier is the placeholder. Run `zk/build.sh` (regenerates `verifier.sol`), then redeploy.
+- The deployed verifiers are placeholders. Run `npm run zk:build` (regenerates the 3 verifiers), then `FORCE_DEPLOY=1 npm run dev`.
 
 **Q: Contract address mismatch**
 - Re-run `npm run deploy:local` — it rewrites `frontend/src/lib/deployment.json` automatically
@@ -411,4 +418,4 @@ Contributions welcome! Please:
 
 ---
 
-**Version:** 4.0.0 — multi-type credentials (schema-driven), claims + Merkle-root commitment, Groth16 range predicate, wallet-based role access, one-command dev runner
+**Version:** 5.0.0 — multi-type credentials (diploma/competency/license), claims + Merkle-root commitment, 3 ZK predicates (range/equality/membership) via a verifier registry, admin issuer panel + revoke, wallet-based roles, one-command dev runner
