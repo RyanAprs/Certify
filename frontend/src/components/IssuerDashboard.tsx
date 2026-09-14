@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { isAddress, parseAbiItem } from "viem";
 import toast from "react-hot-toast";
 import { useState } from "react";
-import { Stamp, UserCheck, UserX, Users, Inbox, FileText } from "lucide-react";
+import { Stamp, UserCheck, UserX, Users, Inbox, FileText, ShieldPlus, X } from "lucide-react";
 import clsx from "clsx";
 
 import { useIssuerCertificates } from "../hooks/useCertificates";
@@ -70,6 +70,35 @@ function useMemberRequests(issuer?: `0x${string}`) {
   });
 }
 
+function useRegisteredIssuers() {
+  return useQuery({
+    queryKey: ["registeredIssuers"],
+    queryFn: async () => {
+      const logs = await publicClient.getLogs({
+        address: registryContract.address,
+        event: parseAbiItem(
+          "event IssuerRegistered(address indexed issuer, address indexed creator)"
+        ),
+        fromBlock: deploymentBlock,
+        toBlock: "latest",
+      });
+      const candidates = [...new Set(logs.map((l) => l.args.issuer as string))];
+      // Keep only those still registered (a removed issuer's event still exists).
+      const checked = await Promise.all(
+        candidates.map(async (a) => ({
+          a,
+          ok: (await publicClient.readContract({
+            ...registryContract,
+            functionName: "registeredIssuers",
+            args: [a as `0x${string}`],
+          })) as boolean,
+        }))
+      );
+      return checked.filter((x) => x.ok).map((x) => x.a);
+    },
+  });
+}
+
 export const IssuerDashboard = () => {
   const { address } = useAccount();
   const { data: certificates, isLoading: certsLoading } =
@@ -80,14 +109,50 @@ export const IssuerDashboard = () => {
     refetch: refetchMembers,
   } = useMemberRequests(address);
   const { write } = useRegistryWrite();
-  const { refreshRole } = useRole();
+  const { isAdmin, refreshRole } = useRole();
+  const { data: issuers, refetch: refetchIssuers } = useRegisteredIssuers();
 
   const [schema, setSchema] = useState<Schema>(SCHEMAS[0]);
   const [processing, setProcessing] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [issuerAddr, setIssuerAddr] = useState("");
+  const [registering, setRegistering] = useState(false);
+  const [removingIssuer, setRemovingIssuer] = useState<string | null>(null);
 
   const form = useForm<IssueForm>({ defaultValues: { holder: "", display: {}, claims: {} } });
   const { errors } = form.formState;
+
+  const onRemoveIssuer = async (addr: string) => {
+    setRemovingIssuer(addr);
+    try {
+      await write("removeIssuer", [addr as `0x${string}`], {
+        pending: "Removing issuer…",
+        success: "Issuer removed",
+      });
+      await refetchIssuers();
+    } catch {
+      /* toast shown */
+    } finally {
+      setRemovingIssuer(null);
+    }
+  };
+
+  const onRegisterIssuer = async () => {
+    if (!isAddress(issuerAddr)) return toast.error("Enter a valid Ethereum address");
+    setRegistering(true);
+    try {
+      await write("registerIssuer", [issuerAddr as `0x${string}`], {
+        pending: "Registering issuer…",
+        success: "Issuer registered",
+      });
+      setIssuerAddr("");
+      await refetchIssuers();
+    } catch {
+      /* toast shown */
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   const onDecision = async (holder: string, approve: boolean) => {
     setProcessing(holder);
@@ -164,6 +229,58 @@ export const IssuerDashboard = () => {
         description="Issue academic and competency credentials, and manage which holders can receive them."
         aside={address ? <DataChip label="signed in" value={address} /> : undefined}
       />
+
+      {isAdmin && (
+        <div className="panel-pad mb-6 border-primary/30 bg-primary-tint/40">
+          <div className="mb-1 flex items-center gap-2">
+            <ShieldPlus size={17} className="text-primary" aria-hidden="true" />
+            <h2 className="font-semibold text-ink">Admin · issuer registry</h2>
+          </div>
+          <p className="mb-4 text-sm text-ink-muted">
+            Authorize another wallet to issue credentials.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              className="input-mono flex-1"
+              placeholder="0x… wallet to authorize"
+              value={issuerAddr}
+              onChange={(e) => setIssuerAddr(e.target.value)}
+            />
+            <button
+              className="btn-secondary sm:w-48"
+              onClick={onRegisterIssuer}
+              disabled={registering}
+            >
+              <ShieldPlus size={16} aria-hidden="true" />
+              {registering ? "Registering…" : "Register issuer"}
+            </button>
+          </div>
+          {issuers && issuers.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-medium text-ink-subtle">
+                Registered issuers
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                {issuers.map((a) => (
+                  <li key={a} className="flex items-center gap-1">
+                    <DataChip value={a} />
+                    {a.toLowerCase() !== address?.toLowerCase() && (
+                      <button
+                        onClick={() => onRemoveIssuer(a)}
+                        disabled={removingIssuer === a}
+                        aria-label="Remove issuer"
+                        className="rounded-md p-1 text-ink-subtle transition hover:bg-danger-tint hover:text-danger-ink disabled:opacity-50"
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         {/* Issue */}

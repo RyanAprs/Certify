@@ -66,6 +66,7 @@ export interface CertifyRegistryInterface extends Interface {
       | "memberRequests"
       | "registerIssuer"
       | "registeredIssuers"
+      | "removeIssuer"
       | "renounceRole"
       | "requestMembership"
       | "revokeRole"
@@ -85,6 +86,7 @@ export interface CertifyRegistryInterface extends Interface {
       | "CertificateShared"
       | "CertificateStatusChanged"
       | "IssuerRegistered"
+      | "IssuerRemoved"
       | "MemberDecision"
       | "MemberRequested"
       | "RoleAdminChanged"
@@ -156,6 +158,10 @@ export interface CertifyRegistryInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "registeredIssuers",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "removeIssuer",
     values: [AddressLike]
   ): string;
   encodeFunctionData(
@@ -274,6 +280,10 @@ export interface CertifyRegistryInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "removeIssuer",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "renounceRole",
     data: BytesLike
   ): Result;
@@ -382,6 +392,19 @@ export namespace IssuerRegisteredEvent {
   export interface OutputObject {
     issuer: string;
     creator: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace IssuerRemovedEvent {
+  export type InputTuple = [issuer: AddressLike, remover: AddressLike];
+  export type OutputTuple = [issuer: string, remover: string];
+  export interface OutputObject {
+    issuer: string;
+    remover: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -660,6 +683,12 @@ export interface CertifyRegistry extends BaseContract {
     "view"
   >;
 
+  removeIssuer: TypedContractMethod<
+    [issuer: AddressLike],
+    [void],
+    "nonpayable"
+  >;
+
   renounceRole: TypedContractMethod<
     [role: BytesLike, callerConfirmation: AddressLike],
     [void],
@@ -838,6 +867,9 @@ export interface CertifyRegistry extends BaseContract {
     nameOrSignature: "registeredIssuers"
   ): TypedContractMethod<[issuer: AddressLike], [boolean], "view">;
   getFunction(
+    nameOrSignature: "removeIssuer"
+  ): TypedContractMethod<[issuer: AddressLike], [void], "nonpayable">;
+  getFunction(
     nameOrSignature: "renounceRole"
   ): TypedContractMethod<
     [role: BytesLike, callerConfirmation: AddressLike],
@@ -945,6 +977,13 @@ export interface CertifyRegistry extends BaseContract {
     IssuerRegisteredEvent.OutputObject
   >;
   getEvent(
+    key: "IssuerRemoved"
+  ): TypedContractEvent<
+    IssuerRemovedEvent.InputTuple,
+    IssuerRemovedEvent.OutputTuple,
+    IssuerRemovedEvent.OutputObject
+  >;
+  getEvent(
     key: "MemberDecision"
   ): TypedContractEvent<
     MemberDecisionEvent.InputTuple,
@@ -1037,6 +1076,17 @@ export interface CertifyRegistry extends BaseContract {
       IssuerRegisteredEvent.InputTuple,
       IssuerRegisteredEvent.OutputTuple,
       IssuerRegisteredEvent.OutputObject
+    >;
+
+    "IssuerRemoved(address,address)": TypedContractEvent<
+      IssuerRemovedEvent.InputTuple,
+      IssuerRemovedEvent.OutputTuple,
+      IssuerRemovedEvent.OutputObject
+    >;
+    IssuerRemoved: TypedContractEvent<
+      IssuerRemovedEvent.InputTuple,
+      IssuerRemovedEvent.OutputTuple,
+      IssuerRemovedEvent.OutputObject
     >;
 
     "MemberDecision(address,address,bool)": TypedContractEvent<

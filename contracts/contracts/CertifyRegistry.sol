@@ -78,6 +78,7 @@ contract CertifyRegistry is AccessControl {
     mapping(bytes32 proofHash => bool used) public usedProofs;
 
     event IssuerRegistered(address indexed issuer, address indexed creator);
+    event IssuerRemoved(address indexed issuer, address indexed remover);
     event MemberRequested(address indexed issuer, address indexed holder);
     event MemberDecision(address indexed issuer, address indexed holder, bool approved);
     event CertificateIssued(uint256 indexed certificateId, address indexed issuer, address indexed holder, bytes32 schemaId);
@@ -119,6 +120,13 @@ contract CertifyRegistry is AccessControl {
         registeredIssuers[issuer] = true;
         _grantRole(ISSUER_ADMIN_ROLE, issuer);
         emit IssuerRegistered(issuer, msg.sender);
+    }
+
+    function removeIssuer(address issuer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(registeredIssuers[issuer], "not an issuer");
+        registeredIssuers[issuer] = false;
+        _revokeRole(ISSUER_ADMIN_ROLE, issuer);
+        emit IssuerRemoved(issuer, msg.sender);
     }
 
     function manageMember(address holder, bool approve) external onlyIssuer(msg.sender) {

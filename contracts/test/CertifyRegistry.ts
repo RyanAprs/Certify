@@ -173,6 +173,32 @@ describe("CertifyRegistry", () => {
     ).to.be.revertedWith("unknown predicate");
   });
 
+  it("admin can register then remove an issuer", async () => {
+    const { admin, verifier, registry } = await deploy();
+    const ROLE = await registry.ISSUER_ADMIN_ROLE();
+
+    await registry.connect(admin).registerIssuer(verifier.address);
+    expect(await registry.registeredIssuers(verifier.address)).to.equal(true);
+    expect(await registry.hasRole(ROLE, verifier.address)).to.equal(true);
+
+    await expect(registry.connect(admin).removeIssuer(verifier.address))
+      .to.emit(registry, "IssuerRemoved")
+      .withArgs(verifier.address, admin.address);
+    expect(await registry.registeredIssuers(verifier.address)).to.equal(false);
+    expect(await registry.hasRole(ROLE, verifier.address)).to.equal(false);
+  });
+
+  it("only admin can remove an issuer, and only real issuers", async () => {
+    const { admin, holder, verifier, registry } = await deploy();
+    await registry.connect(admin).registerIssuer(verifier.address);
+    await expect(
+      registry.connect(holder).removeIssuer(verifier.address)
+    ).to.be.reverted; // AccessControlUnauthorizedAccount
+    await expect(
+      registry.connect(admin).removeIssuer(holder.address)
+    ).to.be.revertedWith("not an issuer");
+  });
+
   it("only admin can register a verifier", async () => {
     const { holder, registry } = await deploy();
     await expect(

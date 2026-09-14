@@ -55,9 +55,28 @@ else
 fi
 say "RPC ready."
 
-# 3. Deploy (writes frontend/src/lib/deployment.json + CertifyRegistry.abi.json)
-say "deploying contracts…"
-( cd "$ROOT/contracts" && npm run deploy:local )
+# 3. Deploy — but skip if a previous deployment is still live on this node, so
+#    reusing a running node preserves your issuer/holder/certificate state.
+#    Force a fresh deploy with:  FORCE_DEPLOY=1 npm run dev
+REG=""
+if [ -f "$ROOT/frontend/src/lib/deployment.json" ]; then
+  REG=$(node -e "try{process.stdout.write(require('$ROOT/frontend/src/lib/deployment.json').registry||'')}catch(e){}" 2>/dev/null || true)
+fi
+HAS_CODE=0
+if [ -n "$REG" ] && [ "$REG" != "0x0000000000000000000000000000000000000000" ]; then
+  CODE=$(curl -s -m 3 -X POST "$RPC" -H 'Content-Type: application/json' \
+    --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_getCode\",\"params\":[\"$REG\",\"latest\"]}" 2>/dev/null || true)
+  case "$CODE" in
+    *'"result":"0x"'*) HAS_CODE=0 ;;
+    *'"result"'*) HAS_CODE=1 ;;
+  esac
+fi
+if [ "${FORCE_DEPLOY:-0}" = "1" ] || [ "$HAS_CODE" != "1" ]; then
+  say "deploying contracts…"
+  ( cd "$ROOT/contracts" && npm run deploy:local )
+else
+  say "existing deployment still live at $REG — skipping deploy (state preserved; FORCE_DEPLOY=1 to redeploy)"
+fi
 
 if [ ! -f "$ROOT/frontend/public/zk/range.wasm" ]; then
   say "note: ZK artifacts not built — 'Verify on-chain' is disabled until you run 'cd zk && ./build.sh'. Everything else works."

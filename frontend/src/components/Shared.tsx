@@ -14,9 +14,13 @@ import {
   FileWarning,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useAccount } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { Certificate, CertificateStatus } from "../types";
 import { fetchJson, ipfsUrl } from "../lib/ipfs";
 import { getSchema } from "../lib/schemas";
+import { useRole } from "../context/RoleContext";
+import { useRegistryWrite } from "../hooks/useRegistryWrite";
 
 /* ---------------- helpers ---------------- */
 
@@ -256,6 +260,31 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
   const issued = Number(certificate.issuedAt) * 1000;
   const schema = getSchema(certificate.schemaId);
 
+  const { address } = useAccount();
+  const { isAdmin } = useRole();
+  const { write } = useRegistryWrite();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const canManage =
+    !!address &&
+    (address.toLowerCase() === certificate.issuer.toLowerCase() || isAdmin);
+
+  async function changeStatus(
+    status: number,
+    msg: { pending: string; success: string }
+  ) {
+    setBusy(true);
+    try {
+      await write("setCertificateStatus", [certificate.id, status], msg);
+      queryClient.invalidateQueries({ queryKey: ["issuerCertificates"] });
+      queryClient.invalidateQueries({ queryKey: ["holderCertificates"] });
+    } catch {
+      /* toast shown */
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     let mounted = true;
     setState("loading");
@@ -282,7 +311,31 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
           №{certificate.id.toString().padStart(4, "0")}
           {schema ? ` · ${schema.label}` : ""}
         </span>
-        <StatusBadge status={certificate.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={certificate.status} />
+          {canManage && certificate.status === "Active" && (
+            <button
+              onClick={() =>
+                changeStatus(2, { pending: "Revoking…", success: "Certificate revoked" })
+              }
+              disabled={busy}
+              className="rounded-md border border-danger/30 px-2 py-0.5 text-xs font-semibold text-danger-ink transition hover:bg-danger-tint disabled:opacity-50"
+            >
+              Revoke
+            </button>
+          )}
+          {canManage && certificate.status === "Revoked" && (
+            <button
+              onClick={() =>
+                changeStatus(1, { pending: "Reactivating…", success: "Certificate reactivated" })
+              }
+              disabled={busy}
+              className="rounded-md border border-valid/30 px-2 py-0.5 text-xs font-semibold text-valid-ink transition hover:bg-valid-tint disabled:opacity-50"
+            >
+              Reactivate
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-5 p-5 sm:grid-cols-[1fr_auto]">
