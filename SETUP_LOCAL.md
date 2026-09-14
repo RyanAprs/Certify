@@ -78,7 +78,7 @@ npx hardhat compile
 
 Expected output:
 ```
-Compiled 8 Solidity files successfully
+Compiled 3 Solidity files successfully
 ```
 
 Ini akan generate:
@@ -150,9 +150,9 @@ npm install       # circomlib
 ```
 
 This:
-- compiles `circuits/certify.circom`,
+- compiles `circuits/range.circom`,
 - runs a Groth16 dev trusted setup,
-- writes `certify.wasm`, `certify.zkey`, `verification_key.json` into
+- writes `range.wasm`, `range.zkey`, `verification_key.json` into
   `frontend/public/zk/`,
 - regenerates `contracts/contracts/verifier.sol` (the real `Groth16Verifier`).
 
@@ -206,7 +206,7 @@ VITE_GATEWAY_URL=gateway.pinata.cloud
 VITE_WALLETCONNECT_ID=your-walletconnect-project-id-optional
 ```
 
-> ZK artifacts (`certify.wasm`/`certify.zkey`) are loaded from `/zk/…` and are
+> ZK artifacts (`range.wasm`/`range.zkey`) are loaded from `/zk/…` and are
 > produced by `cd zk && ./build.sh` — no env vars needed.
 
 ### 5.3 Start Frontend Dev Server
@@ -313,14 +313,14 @@ lsof -ti:8545 | xargs kill -9  # Blockchain
 Check konsol browser (F12) untuk error message:
 
 ```
-Failed to fetch certify.wasm at /zk/certify.wasm
+Failed to fetch range.wasm at /zk/range.wasm
 ```
 
 **Fix**: Verify ZK files di `frontend/public/zk/`
 
 ```bash
 ls -la frontend/public/zk/
-# Should show: certify.wasm, certify.zkey, verification_key.json
+# Should show: range.wasm, range.zkey, verification_key.json
 ```
 
 ### "Holder not member" Error
@@ -371,10 +371,10 @@ Certify/
 │
 ├── zk/                      # Zero-Knowledge Proofs
 │   ├── circuits/
-│   │   ├── certify.circom            # Main ZK circuit
+│   │   ├── range.circom             # Range predicate circuit (Merkle + threshold)
 │   │   ├── certify.r1cs              # Compiled constraints
-│   │   ├── certify.wasm              # WASM binary
-│   │   ├── certify.zkey              # Proving key
+│   │   ├── range.wasm              # WASM binary
+│   │   ├── range.zkey              # Proving key
 │   │   ├── verification_key.json     # Verification key
 │   │   ├── verifier.sol              # Groth16 verifier
 │   │   └── powers_final.ptau         # Trusted setup
@@ -405,8 +405,8 @@ Certify/
 │   │   └── main.tsx
 │   ├── public/
 │   │   └── zk/                       # ZK artifacts
-│   │       ├── certify.wasm
-│   │       ├── certify.zkey
+│   │       ├── range.wasm
+│   │       ├── range.zkey
 │   │       └── verification_key.json
 │   ├── .env.example
 │   └── package.json
@@ -475,7 +475,7 @@ Buka `http://localhost:5173` di browser.
 
 ### ZKP Security
 - ✅ 256-bit cryptographic secret (full entropy)
-- ✅ GPA threshold enforced in circuit (gpa >= minGpa)
+- ✅ Range threshold enforced in circuit (value >= threshold)
 - ✅ Deterministic metadata hashing (canonical JSON)
 - ✅ Groth16 zero-knowledge proofs
 

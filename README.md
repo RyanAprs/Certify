@@ -15,31 +15,24 @@ Certify memungkinkan issuers menerbitkan sertifikat, holders menyimpan & membagi
 
 **Untuk setup lokal dengan instruksi lengkap, lihat [SETUP_LOCAL.md](./SETUP_LOCAL.md)**
 
+**Satu perintah menjalankan seluruh stack** (install → node → deploy → backend → frontend, Ctrl+C mematikan semua):
+
 ```bash
-# 1. Clone & setup
-git clone <repository>
-cd Certify
-
-# 2. (sekali) Build ZK circuit — butuh circom v2 + snarkjs
-cd zk && ./build.sh          # menghasilkan wasm/zkey + verifier.sol
-
-# 3. Terminal 1: Blockchain
-cd contracts && npm install && npx hardhat node
-
-# 4. Terminal 1b: Deploy (menulis alamat+ABI ke frontend otomatis)
-cd contracts && npm run deploy:local
-
-# 5. Terminal 2: Backend
-cd backend && npm install && npm run dev
-
-# 6. Terminal 3: Frontend
-cd frontend && npm install && npm run dev
+git clone <repository> && cd Certify
+npm run dev            # buka http://localhost:5173
 ```
 
-Buka `http://localhost:5173`, connect wallet (Hardhat chain 31337).
+Lalu di MetaMask: tambah network RPC `http://127.0.0.1:8545`, Chain ID `31337`, dan import Account #0 dari output `[chain]` (admin/issuer default).
 
-> Kalau langkah 2 dilewati, kontrak tetap deploy tapi verifier-nya placeholder
-> yang menolak semua proof — verifikasi ZK on-chain baru hidup setelah `build.sh`.
+**(Opsional) aktifkan verifikasi ZK on-chain** — butuh `circom` v2 + powers-of-tau power-14:
+
+```bash
+npm run zk:build       # compile range.circom → range.wasm/zkey + verifier.sol
+npm run dev            # deploy ulang otomatis pakai verifier asli
+```
+
+> Tanpa `zk:build`, semua alur jalan; hanya tombol **"Verify on-chain"** yang nonaktif
+> (verifier placeholder menolak semua proof, dan UI menampilkan peringatan).
 
 ---
 
@@ -58,34 +51,34 @@ Certify
 
 ## ✨ Fitur Utama
 
-### Issuer (Penerbit Sertifikat)
+**Multi-jenis kredensial** (schema-driven). Bawaan: `diploma.v1` (klaim GPA) dan
+`competency.v1` (klaim score/level). Menambah jenis numerik baru cukup menambah
+schema di `frontend/src/lib/schemas.ts` — tanpa circuit baru.
+
+### Issuer (Penerbit)
 - ✅ Register institusi penerbit
 - ✅ Manage membership requests (approve/reject holders)
-- ✅ Issue certificates dengan metadata & IPFS image
-- ✅ View issued certificates on-chain
-- ✅ Revoke certificates jika diperlukan
+- ✅ Pilih jenis kredensial → form dinamis dari schema; issue dengan image IPFS
+- ✅ View issued credentials on-chain; ubah status (Active/Revoked)
 
-### Holder (Penerima Sertifikat)
+### Holder (Penerima)
 - ✅ Request membership ke issuer
-- ✅ View issued certificates
-- ✅ Generate Groth16 ZK proofs untuk selective disclosure
-- ✅ Share certificates dengan verifier (encrypted payload)
-- ✅ Maintain privacy dengan ZKP
+- ✅ View credentials
+- ✅ Share dengan verifier (selective disclosure)
 
-### Verifier (Pihak yang Memverifikasi)
-- ✅ Search certificates by ID
-- ✅ View certificate metadata & images
-- ✅ Verify ZKP proofs on-chain
+### Verifier (Pemverifikasi)
+- ✅ Search credential by ID
+- ✅ Presentation request: pilih klaim + threshold
+- ✅ Verify Groth16 range proof on-chain (nilai tetap privat)
 - ✅ See disclosure history
-- ✅ Validate GPA thresholds via ZKP
 
 ### Security & Privacy
 - ✅ **Wallet Auth** - Connect via RainbowKit; on-chain roles enforce access
-- ✅ **ZKP-based Verification** - Holder proves GPA >= threshold tanpa reveal GPA (range check dienforce di circuit)
+- ✅ **ZKP Range Proof** - Buktikan `nilai_klaim >= threshold` tanpa reveal nilai (range check dienforce di circuit)
 - ✅ **Immutable Verifier** - Alamat verifier di-set di constructor, tidak bisa di-swap
 - ✅ **Proof Replay Protection** - Setiap proof single-use (`usedProofs` hash tracking)
-- ✅ **Poseidon Commitment** - `Poseidon(gpa, secret)` mengikat proof ke sertifikat
-- ✅ **Blinding Secret** - Field element acak per sertifikat
+- ✅ **Merkle Commitment** - `metadataCommitment` = Merkle root dari klaim; proof terikat ke root
+- ✅ **Blinding Salt** - Field element acak per klaim
 
 ## 📚 Documentation
 
@@ -104,15 +97,15 @@ Certify
 Satu registry (bukan dua — `ZKPCertify` lama sudah dihapus):
 
 ```
-Groth16Verifier (di-generate snarkjs dari circuit)
-  └─ verifyProof(a, b, c, [commitment, minGpa]) → validasi proof
+Groth16Verifier (di-generate snarkjs dari range.circom)
+  └─ verifyProof(a, b, c, [root, keyHash, threshold]) → validasi proof
 
 CertifyRegistry (registry tunggal)
   ├─ Issuer management (AccessControl: ISSUER_ADMIN_ROLE)
   ├─ Membership approval flow
-  ├─ Certificate lifecycle (Active/Pending/Revoked)
+  ├─ Certificate lifecycle (Active/Pending/Revoked) + schemaId (jenis kredensial)
   ├─ Selective disclosure tracking
-  └─ verifySelectiveProof() → commitment binding + replay protection
+  └─ verifyRangeProof() → root binding + replay protection
 ```
 
 ### Contract Addresses
@@ -134,17 +127,17 @@ CertifyRegistry:   0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 **Issuer:**
 - `requestMembership(issuer)` - Holder requests to join
 - `manageMember(holder, approve)` - Issuer approves/rejects
-- `issueCertificate(holder, metadataCid, commitment)` - Issue cert
+- `issueCertificate(holder, metadataCid, commitment, schemaId)` - Issue credential (commitment = Merkle root)
 
 **Holder:**
 - `shareCertificate(certId, verifier, queryHash, encPayload)` - Share with verifier
 
 **Verifier:**
-- `verifySelectiveProof(certId, a, b, c, pubSignals)` - Verify Groth16 proof on-chain
-  (`pubSignals = [commitment, minGpa]`; commitment harus cocok dengan sertifikat)
+- `verifyRangeProof(certId, a, b, c, pubSignals)` - Verify Groth16 range proof on-chain
+  (`pubSignals = [root, keyHash, threshold]`; root harus cocok dengan `cert.metadataCommitment`)
 
 **Getter:**
-- `certificates(certId)` - Certificate struct (id, issuer, holder, cid, commitment, status, issuedAt)
+- `certificates(certId)` - Certificate struct (id, issuer, holder, cid, commitment, status, issuedAt, schemaId)
 - `getHolderCertificates(holder)` - List holder's certs
 - `getIssuerCertificates(issuer)` - List issuer's certs
 - `getDisclosures(certId)` - Selective-disclosure history
@@ -207,17 +200,16 @@ VITE_WALLETCONNECT_ID=            # opsional (mobile wallets)
 ### ZKP Proof Generation Flow
 
 ```
-1. Verifier/Holder cari sertifikat → fetch dari blockchain
-2. Metadata dari IPFS (via metadataCid) — berisi gpa + secret
-3. Circuit inputs:
-   - gpa    (private, scaled ×100)
-   - secret (private, blinding factor)
-   - minGpa (public, scaled ×100)
-4. Generate proof dengan certify.wasm + certify.zkey (snarkjs Groth16)
-5. Public signals: [commitment, minGpa]   (commitment = Poseidon(gpa, secret))
-6. Submit ke CertifyRegistry.verifySelectiveProof(certId, a, b, c, pubSignals)
-7. Kontrak cek commitment == cert.metadataCommitment, cek replay, verifikasi
-   Groth16 → emit ZKVerified
+1. Verifier/Holder cari credential → fetch dari blockchain (termasuk schemaId)
+2. Metadata dari IPFS (via metadataCid) — berisi claims + salts
+3. Pilih klaim (mis. gpa/score/level) + threshold, lalu bangun input circuit:
+   - value, salt, Merkle pathElements/pathIndices   (private)
+   - keyHash, threshold                              (public)
+4. Generate proof dengan range.wasm + range.zkey (snarkjs Groth16)
+5. Public signals: [root, keyHash, threshold]   (root = Merkle root klaim)
+6. Submit ke CertifyRegistry.verifyRangeProof(certId, a, b, c, pubSignals)
+7. Kontrak cek root == cert.metadataCommitment, cek replay, verifikasi
+   Groth16 → emit ZKVerified(certId, verifier, keyHash, threshold)
 ```
 
 ### IPFS Integration
@@ -229,7 +221,7 @@ Certificate Lifecycle:
 ├─ Issuer uploads image → IPFS → imageCid
 ├─ Issuer creates metadata JSON with imageCid
 ├─ Uploads metadata (incl. secret) → IPFS → metadataCid
-├─ Computes commitment: Poseidon(gpaScaled, secret)
+├─ Computes commitment: Merkle root of the claims (Poseidon leaves)
 ├─ Issues certificate on-chain (metadataCid + commitment)
 └─ Holder/Verifier dapat retrieve metadata dari IPFS
 
@@ -265,7 +257,7 @@ Selective Disclosure:
 
 ### Zero-Knowledge Proofs
 - ✅ **Groth16** - Industry-standard, fast verification
-- ✅ **Enforced GPA Range** - `GreaterEqThan` constraint benar-benar meng-enforce `gpa >= minGpa` (bug lama: dulu tidak di-cek sama sekali)
+- ✅ **Enforced Range** - `GreaterEqThan` meng-enforce `value >= threshold` di circuit (bug lama: dulu tidak di-cek sama sekali)
 - ✅ **Poseidon Commitment** - Hash yang collision-resistant & binding di dalam circuit
 - ✅ **Commitment Binding** - Proof terikat ke `cert.metadataCommitment` on-chain
 - ✅ **Replay Protection** - `usedProofs[proofHash]` menolak proof yang sama dua kali
@@ -313,19 +305,19 @@ Selective Disclosure:
 3. Upload certificate image → IPFS
 4. Create metadata (name, GPA, institution, etc.)
 5. Issue certificate → stored on-chain
-6. metadataCommitment = Poseidon(gpaScaled, secret) → stored on-chain
+6. metadataCommitment = Merkle root of the claims → stored on-chain (+ schemaId)
 ```
 
 ### Holder/Verifier Proving GPA
 ```
 1. Fetch certificate from blockchain
 2. Fetch metadata from IPFS (berisi gpa + secret)
-3. Set minGpa threshold (e.g., 3.5)
+3. Pilih klaim + threshold (mis. GPA ≥ 3.5, atau score ≥ 80)
 4. Generate ZK proof locally:
-   - Private: gpa, secret
-   - Public:  minGpa
-5. Send proof to CertifyRegistry.verifySelectiveProof
-6. Contract verifies: gpa >= minGpa (enforced di circuit) + commitment match
+   - Private: value, salt, Merkle path
+   - Public:  keyHash, threshold
+5. Send proof to CertifyRegistry.verifyRangeProof
+6. Contract verifies: value >= threshold (enforced di circuit) + root match
 7. ZKVerified event emitted
 ```
 
@@ -334,7 +326,7 @@ Selective Disclosure:
 1. Get certificate ID from holder
 2. Fetch certificate metadata from IPFS
 3. View proof verification status from blockchain
-4. Confirms holder proved GPA >= minGpa
+4. Confirms holder proved value >= threshold (nilai tetap privat)
 5. No actual GPA value revealed ✅
 ```
 
@@ -371,7 +363,7 @@ npx hardhat run scripts/deploy.ts --network sepolia
 - Check RPC URL in MetaMask: `http://127.0.0.1:8545`
 
 **Q: ZKP proof generation fails / Verifier page shows "ZK artifacts missing"**
-- Run `cd zk && ./build.sh` to generate `certify.wasm`/`certify.zkey` into `frontend/public/zk/`
+- Run `cd zk && ./build.sh` to generate `range.wasm`/`range.zkey` into `frontend/public/zk/`
 - Requires `circom` v2 installed
 
 **Q: On-chain verify always reverts "invalid proof"**
@@ -419,4 +411,4 @@ Contributions welcome! Please:
 
 ---
 
-**Version:** 3.0.0 — single registry, sound Groth16 GPA circuit (Poseidon commitment + enforced range), wallet-based role access
+**Version:** 4.0.0 — multi-type credentials (schema-driven), claims + Merkle-root commitment, Groth16 range predicate, wallet-based role access, one-command dev runner

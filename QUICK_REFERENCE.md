@@ -12,6 +12,19 @@ node --version  # v18+
 npm --version   # v9+
 ```
 
+### Fastest: one command
+```bash
+git clone <repo-url> && cd Certify
+npm run dev            # install → node → deploy → backend → frontend (Ctrl+C stops all)
+```
+Then add the Hardhat network to MetaMask (below) and import Account #0. Done.
+
+For ZK on-chain verify: `npm run zk:build` (needs circom v2 + ptau-14), then `npm run dev` again.
+
+---
+
+### Or run each piece manually
+
 ### Step 1: Clone (1 min)
 ```bash
 git clone <repo-url>
@@ -93,10 +106,9 @@ cd contracts
 npx hardhat test
 ```
 
-### Recompile Circuit
+### Rebuild Circuit (range predicate)
 ```bash
-cd zk/circuits
-circom certify.circom -o . --r1cs --wasm
+npm run zk:build          # = cd zk && ./build.sh (needs circom v2 + ptau-14)
 ```
 
 ### View Contract ABI
@@ -124,14 +136,12 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 After deploying, save these:
 
 ```
-Groth16 Verifier:   0x5FbDB2315678afccb333f8a9c45ead413b7c77bf
-CertifyRegistry:    0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-CertifyRegistry:    0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+Groth16Verifier:   0x5FbDB2315678afccb333f8a9c45ead413b7c77bf
+CertifyRegistry:   0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 ```
 
-Use in `frontend/.env`:
-- `VITE_CONTRACT_ADDRESS` = CertifyRegistry
-- addresses are auto-written to `frontend/src/lib/deployment.json`
+Addresses are **auto-written** to `frontend/src/lib/deployment.json` by the deploy
+script — no manual `.env` editing needed (`VITE_CONTRACT_ADDRESS` is an optional override).
 
 ---
 
@@ -153,9 +163,9 @@ Certify/
 │
 ├── zk/                  # Zero-knowledge proofs
 │   └── circuits/
-│       ├── certify.circom
-│       ├── certify.wasm
-│       └── certify.zkey
+│       ├── range.circom
+│       ├── range.wasm
+│       └── range.zkey
 │
 ├── README.md            # Overview
 ├── SETUP_LOCAL.md       # 📖 Full setup guide
