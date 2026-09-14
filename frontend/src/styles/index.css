@@ -2,20 +2,177 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  color: #f8fafc;
+/* ============================================================
+   Certify — "Credential Ledger" design tokens
+   Light, document-grade institutional system. OKLCH throughout.
+   Tokens are raw "L C H" triplets; tailwind wraps them in oklch().
+   ============================================================ */
+:root {
+  /* Surfaces — true neutral paper, NOT cream */
+  --paper: 0.986 0.003 255;
+  --surface: 1 0 0;
+  --sunken: 0.966 0.004 255;
+
+  /* Ink ramp — near-black with a whisper of document blue */
+  --ink: 0.24 0.02 262;
+  --ink-muted: 0.46 0.018 262;
+  --ink-subtle: 0.52 0.014 262;
+
+  /* Lines */
+  --border: 0.906 0.004 262;
+  --border-strong: 0.82 0.006 262;
+
+  /* Primary — official-document ink blue (deliberately NOT crypto purple) */
+  --primary: 0.47 0.148 262;
+  --primary-hover: 0.4 0.155 262;
+  --primary-tint: 0.955 0.028 262;
+
+  /* Semantic status */
+  --valid: 0.58 0.13 156;
+  --valid-ink: 0.44 0.12 156;
+  --valid-tint: 0.965 0.03 156;
+
+  --pending: 0.74 0.13 78;
+  --pending-ink: 0.52 0.1 70;
+  --pending-tint: 0.97 0.04 82;
+
+  --danger: 0.57 0.19 27;
+  --danger-ink: 0.5 0.17 27;
+  --danger-tint: 0.966 0.028 27;
+
+  /* Semantic z-index scale */
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-backdrop: 1200;
+  --z-modal: 1300;
+  --z-toast: 1400;
+  --z-tooltip: 1500;
+
+  color-scheme: light;
 }
 
-.btn-primary {
-  @apply w-full rounded-lg bg-primary px-4 py-2 font-semibold text-white transition hover:bg-purple-500 disabled:opacity-50;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Faint archival grid — structural texture, not decoration */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(
+      oklch(var(--ink) / 0.025) 1px,
+      transparent 1px
+    );
+    background-size: 28px 28px;
+    mask-image: linear-gradient(to bottom, black, transparent 70%);
+    pointer-events: none;
+  }
+  ::selection {
+    background: oklch(var(--primary) / 0.2);
+  }
+  :focus-visible {
+    outline: 2px solid oklch(var(--primary) / 0.55);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+  /* Restrained scrollbar, not a reinvented affordance */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(var(--border-strong)) transparent;
+  }
 }
 
-.btn-secondary {
-  @apply w-full rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800;
+@layer components {
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5
+      text-sm font-semibold transition-[background-color,box-shadow,transform,color]
+      duration-150 disabled:pointer-events-none disabled:opacity-55;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(0.5px) scale(0.99);
+  }
+  .btn-primary {
+    @apply btn bg-primary text-white shadow-xs hover:bg-primary-hover;
+  }
+  .btn-secondary {
+    @apply btn border border-line-strong bg-surface text-ink shadow-xs
+      hover:border-primary/40 hover:bg-primary-tint;
+  }
+  .btn-ghost {
+    @apply btn text-ink-muted hover:bg-sunken hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white shadow-xs hover:brightness-95;
+  }
+
+  /* ---------- Form controls ---------- */
+  .label {
+    @apply mb-1.5 block text-[0.8125rem] font-medium text-ink-muted;
+  }
+  .input {
+    @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2.5
+      text-sm text-ink shadow-xs transition-[border-color,box-shadow] duration-150
+      placeholder:text-ink-subtle
+      focus:border-primary focus:shadow-focus focus:outline-none
+      disabled:cursor-not-allowed disabled:bg-sunken;
+  }
+  .input-mono {
+    @apply input font-mono text-[0.8125rem] tracking-tight;
+  }
+
+  /* ---------- Surfaces ---------- */
+  .panel {
+    @apply rounded-xl border border-line bg-surface shadow-sm;
+  }
+  .panel-pad {
+    @apply panel p-5 sm:p-6;
+  }
+
+  /* ---------- Status badge ---------- */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
+      text-xs font-semibold;
+  }
+
+  /* ---------- Mono data chip (addresses / CIDs / hashes) ---------- */
+  .chip-mono {
+    @apply inline-flex max-w-full items-center gap-1.5 rounded-md border border-line
+      bg-sunken px-2 py-1 font-mono text-[0.75rem] text-ink-muted;
+  }
+
+  /* ---------- Loading skeleton ---------- */
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-sunken;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(var(--ink) / 0.05),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: shimmer 1.6s infinite;
+  }
 }
 
-.input {
-  @apply w-full rounded-lg border border-slate-700 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none;
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton::after {
+    display: none;
+  }
 }

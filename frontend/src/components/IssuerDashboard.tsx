@@ -4,11 +4,20 @@ import { useQuery } from "@tanstack/react-query";
 import { isAddress, parseAbiItem } from "viem";
 import toast from "react-hot-toast";
 import { useState } from "react";
+import { Stamp, UserCheck, UserX, Users, Inbox, FileText } from "lucide-react";
 
 import { useIssuerCertificates } from "../hooks/useCertificates";
 import { useRegistryWrite } from "../hooks/useRegistryWrite";
 import { useRole } from "../context/RoleContext";
-import { CertificateCard, Notice, Spinner } from "./Shared";
+import {
+  CertificateCard,
+  DataChip,
+  EmptyState,
+  Field,
+  PageHeader,
+  Skeleton,
+  SkeletonCard,
+} from "./Shared";
 import { uploadFile, uploadJson } from "../lib/ipfs";
 import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
 import {
@@ -68,7 +77,8 @@ function useMemberRequests(issuer?: `0x${string}`) {
 
 export const IssuerDashboard = () => {
   const { address } = useAccount();
-  const { data: certificates } = useIssuerCertificates(address);
+  const { data: certificates, isLoading: certsLoading } =
+    useIssuerCertificates(address);
   const {
     data: members,
     isLoading: membersLoading,
@@ -90,6 +100,7 @@ export const IssuerDashboard = () => {
       description: "",
     },
   });
+  const { errors } = form.formState;
 
   const onDecision = async (holder: string, approve: boolean) => {
     setProcessing(holder);
@@ -118,9 +129,6 @@ export const IssuerDashboard = () => {
         error: "Image upload failed",
       });
 
-      // The secret blinds the on-chain commitment; the holder needs it later to
-      // prove their GPA. NOTE: in production this metadata should be encrypted
-      // to the holder so only they can read `secret`/`gpa`.
       const secret = generateSecret();
       const metadata: CertificateMetadata = {
         name: values.name,
@@ -134,9 +142,6 @@ export const IssuerDashboard = () => {
       };
 
       const metadataCid = await uploadJson(metadata);
-      // Poseidon(gpa, secret) — the SAME commitment the ZK circuit reproduces,
-      // so on-chain verification can actually succeed (previously this used a
-      // keccak of unordered JSON that never matched the circuit).
       const metadataCommitment = commitmentFromMetadata(metadata);
 
       await write(
@@ -153,163 +158,182 @@ export const IssuerDashboard = () => {
   });
 
   return (
-    <section className="space-y-6">
-      <header>
-        <h2 className="text-xl font-semibold">Issuer Workspace</h2>
-        <p className="text-sm text-slate-300">
-          Issue certificates (with an IPFS image) and manage holder access.
-        </p>
-      </header>
+    <section>
+      <PageHeader
+        icon={<Stamp size={22} aria-hidden="true" />}
+        eyebrow="Workspace"
+        title="Issuer"
+        description="Issue academic credentials and manage which holders can receive them."
+        aside={address ? <DataChip label="signed in" value={address} /> : undefined}
+      />
 
-      {/* Create Certificate */}
-      <form
-        onSubmit={onIssue}
-        className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4"
-      >
-        <h3 className="font-semibold">Create Certificate</h3>
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        {/* Issue */}
+        <form onSubmit={onIssue} className="panel-pad space-y-4">
+          <div className="flex items-center gap-2">
+            <FileText size={17} className="text-primary" aria-hidden="true" />
+            <h2 className="font-semibold text-ink">Issue a certificate</h2>
+          </div>
 
-        <Field label="Holder address" error={form.formState.errors.holder?.message}>
-          <input
-            className="input"
-            placeholder="0x…"
-            disabled={isIssuing}
-            {...form.register("holder", {
-              required: "Holder address is required",
-              validate: (v) => isAddress(v) || "Invalid Ethereum address",
-            })}
-          />
-        </Field>
+          <Field label="Holder address" error={errors.holder?.message}>
+            <input
+              className="input-mono"
+              placeholder="0x…"
+              disabled={isIssuing}
+              {...form.register("holder", {
+                required: "Holder address is required",
+                validate: (v) => isAddress(v) || "Enter a valid Ethereum address",
+              })}
+            />
+          </Field>
 
-        <Field label="Name" error={form.formState.errors.name?.message}>
-          <input className="input" disabled={isIssuing}
-            {...form.register("name", { required: "Name is required" })} />
-        </Field>
-        <Field label="Institution">
-          <input className="input" disabled={isIssuing}
-            {...form.register("institution", { required: true })} />
-        </Field>
-        <Field label="Program">
-          <input className="input" disabled={isIssuing}
-            {...form.register("program", { required: true })} />
-        </Field>
-        <Field label="GPA (0–5)" error={form.formState.errors.gpa?.message}>
-          <input
-            className="input"
-            type="number"
-            step="0.01"
-            min="0"
-            max="5"
-            disabled={isIssuing}
-            {...form.register("gpa", {
-              required: "GPA is required",
-              validate: (v) => {
-                const n = parseFloat(v);
-                return (!isNaN(n) && n >= 0 && n <= 5) || "GPA must be between 0 and 5";
-              },
-            })}
-          />
-        </Field>
-        <Field label="Description">
-          <textarea className="input min-h-[80px]" disabled={isIssuing}
-            {...form.register("description", { required: true })} />
-        </Field>
-        <Field label="Certificate image (PNG/JPEG)">
-          <input className="input" type="file" accept="image/*" disabled={isIssuing}
-            {...form.register("image", { required: true })} />
-        </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Full name" error={errors.name?.message}>
+              <input className="input" placeholder="Ada Lovelace" disabled={isIssuing}
+                {...form.register("name", { required: "Name is required" })} />
+            </Field>
+            <Field label="GPA" hint="0–5 scale" error={errors.gpa?.message}>
+              <input className="input" type="number" step="0.01" min="0" max="5"
+                placeholder="3.85" disabled={isIssuing}
+                {...form.register("gpa", {
+                  required: "GPA is required",
+                  validate: (v) => {
+                    const n = parseFloat(v);
+                    return (!isNaN(n) && n >= 0 && n <= 5) || "Must be between 0 and 5";
+                  },
+                })} />
+            </Field>
+            <Field label="Institution">
+              <input className="input" placeholder="University of…" disabled={isIssuing}
+                {...form.register("institution", { required: true })} />
+            </Field>
+            <Field label="Program">
+              <input className="input" placeholder="B.Sc. Computer Science" disabled={isIssuing}
+                {...form.register("program", { required: true })} />
+            </Field>
+          </div>
 
-        <button className="btn-primary w-full" disabled={isIssuing}>
-          {isIssuing ? "Issuing…" : "Issue Certificate"}
-        </button>
-      </form>
+          <Field label="Description">
+            <textarea className="input min-h-[80px] resize-y" disabled={isIssuing}
+              placeholder="Awarded with honours…"
+              {...form.register("description", { required: true })} />
+          </Field>
 
-      {/* Membership */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Pending Requests</h3>
-          <button
-            onClick={() => {
-              refetchMembers();
-              refreshRole();
-            }}
-            disabled={membersLoading}
-            className="text-xs uppercase tracking-wide text-primary hover:text-primary/80 disabled:opacity-50"
-          >
-            {membersLoading ? "Loading…" : "Refresh"}
+          <Field label="Certificate image" hint="PNG or JPEG, stored on IPFS">
+            <input className="input file:mr-3 file:rounded file:border-0 file:bg-sunken file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
+              type="file" accept="image/*" disabled={isIssuing}
+              {...form.register("image", { required: true })} />
+          </Field>
+
+          <button className="btn-primary w-full" disabled={isIssuing}>
+            <Stamp size={16} aria-hidden="true" />
+            {isIssuing ? "Issuing…" : "Issue certificate"}
           </button>
-        </div>
+        </form>
 
-        {membersLoading && <Spinner label="Loading members…" />}
-        {!membersLoading && (members?.pending.length ?? 0) === 0 && (
-          <p className="text-sm text-slate-400">No pending requests.</p>
-        )}
-        {members?.pending.map((holder) => (
-          <div
-            key={holder}
-            className="flex flex-col items-center justify-between gap-3 rounded-lg border border-slate-800 p-3 md:flex-row"
-          >
-            <p className="break-all font-mono text-sm">{holder}</p>
-            <div className="flex gap-3">
+        {/* Membership */}
+        <div className="space-y-6">
+          <div className="panel-pad">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Inbox size={17} className="text-primary" aria-hidden="true" />
+                <h2 className="font-semibold text-ink">Pending requests</h2>
+              </div>
               <button
-                onClick={() => onDecision(holder, true)}
-                disabled={processing === holder}
-                className="btn-secondary disabled:opacity-50"
+                onClick={() => {
+                  refetchMembers();
+                  refreshRole();
+                }}
+                disabled={membersLoading}
+                className="text-xs font-semibold text-primary transition hover:text-primary-hover disabled:opacity-50"
               >
-                {processing === holder ? "…" : "Approve"}
-              </button>
-              <button
-                onClick={() => onDecision(holder, false)}
-                disabled={processing === holder}
-                className="btn-danger disabled:opacity-50"
-              >
-                {processing === holder ? "…" : "Reject"}
+                {membersLoading ? "Refreshing…" : "Refresh"}
               </button>
             </div>
-          </div>
-        ))}
 
-        <h3 className="mt-6 font-semibold">Approved Members</h3>
-        {(members?.approved.length ?? 0) === 0 && (
-          <p className="text-sm text-slate-400">No members yet.</p>
-        )}
-        {members?.approved.map((member) => (
-          <div key={member} className="rounded-lg border border-slate-800 p-3">
-            <p className="break-all font-mono text-sm">{member}</p>
+            {membersLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : (members?.pending.length ?? 0) === 0 ? (
+              <EmptyState icon={<Inbox size={26} />} title="No pending requests">
+                When a holder requests membership, they'll appear here for approval.
+              </EmptyState>
+            ) : (
+              <ul className="space-y-2">
+                {members?.pending.map((holder) => (
+                  <li
+                    key={holder}
+                    className="flex flex-col gap-3 rounded-lg border border-line bg-sunken/40 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <DataChip value={holder} />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onDecision(holder, true)}
+                        disabled={processing === holder}
+                        className="btn-secondary flex-1 sm:flex-none"
+                      >
+                        <UserCheck size={15} aria-hidden="true" />
+                        {processing === holder ? "…" : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => onDecision(holder, false)}
+                        disabled={processing === holder}
+                        className="btn-ghost text-danger-ink hover:bg-danger-tint"
+                      >
+                        <UserX size={15} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        ))}
+
+          <div className="panel-pad">
+            <div className="mb-4 flex items-center gap-2">
+              <Users size={17} className="text-primary" aria-hidden="true" />
+              <h2 className="font-semibold text-ink">Approved members</h2>
+            </div>
+            {(members?.approved.length ?? 0) === 0 ? (
+              <p className="text-sm text-ink-subtle">No approved members yet.</p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {members?.approved.map((member) => (
+                  <li key={member}>
+                    <DataChip value={member} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Issued certificates */}
-      <div className="space-y-3">
-        <h3 className="font-semibold">Certificates</h3>
-        <div className="grid gap-4">
-          {certificates && certificates.length > 0 ? (
-            certificates.map((c) => (
+      <div className="mt-10">
+        <h2 className="mb-4 font-serif text-xl font-semibold text-ink">
+          Issued certificates
+        </h2>
+        {certsLoading ? (
+          <div className="grid gap-5 md:grid-cols-2">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : certificates && certificates.length > 0 ? (
+          <div className="grid gap-5 md:grid-cols-2">
+            {certificates.map((c) => (
               <CertificateCard key={c.id.toString()} certificate={c} />
-            ))
-          ) : (
-            <Notice tone="info">No certificates issued yet.</Notice>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={<FileText size={28} />} title="No certificates issued yet">
+            Approve a holder above, then issue their first credential. It will be
+            recorded on-chain with a zero-knowledge commitment.
+          </EmptyState>
+        )}
       </div>
     </section>
   );
 };
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-sm text-slate-400">{label}</span>
-      {children}
-      {error && <span className="block text-xs text-red-400">{error}</span>}
-    </label>
-  );
-}

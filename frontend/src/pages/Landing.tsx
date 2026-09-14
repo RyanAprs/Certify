@@ -1,71 +1,97 @@
 import { Link } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Stamp, GraduationCap, ShieldCheck, ArrowRight } from "lucide-react";
 import { useRole } from "../context/RoleContext";
+
+const flow = [
+  {
+    Icon: Stamp,
+    role: "Issuer",
+    body: "A registered institution approves a holder and issues a certificate, storing only a commitment on-chain.",
+  },
+  {
+    Icon: GraduationCap,
+    role: "Holder",
+    body: "The student holds the credential in their wallet and shares it selectively — proving a GPA threshold, never the exact value.",
+  },
+  {
+    Icon: ShieldCheck,
+    role: "Verifier",
+    body: "An employer verifies the zero-knowledge proof on-chain. The claim checks out; the underlying data stays private.",
+  },
+];
 
 export const LandingPage = () => {
   const { isConnected, isIssuer, isAdmin } = useRole();
   const canIssue = isIssuer || isAdmin;
 
   return (
-    <section className="space-y-8 text-center">
-      <div className="space-y-4">
-        <p className="text-sm uppercase tracking-[0.4em] text-secondary">
-          Certify
+    <div className="space-y-14">
+      <section className="max-w-3xl">
+        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-ink-subtle">
+          Zero-knowledge academic credentials
         </p>
-        <h1 className="text-4xl font-bold">
-          On-Chain Academic Certificate Verification
+        <h1 className="mt-3 text-balance font-serif text-4xl font-semibold leading-[1.05] text-ink sm:text-5xl">
+          Verify what matters. Reveal nothing else.
         </h1>
-        <p className="mx-auto max-w-2xl text-slate-300">
-          A blockchain + ZKP platform for issuing, storing, and verifying
-          academic credentials with strong privacy (selective disclosure of GPA
-          without revealing the exact value).
+        <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-ink-muted">
+          Certify is an on-chain registry for academic credentials. Institutions
+          issue, students hold, and anyone can verify a GPA threshold with a
+          zero-knowledge proof — without exposing the transcript behind it.
         </p>
-      </div>
 
-      {!isConnected ? (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-slate-400">Connect your wallet to get started.</p>
-          <ConnectButton />
-        </div>
-      ) : (
-        <div className="flex flex-wrap justify-center gap-4">
-          {canIssue && (
-            <Link className="btn-primary max-w-xs" to="/issuer">
-              Go to Issuer workspace
-            </Link>
+        <div className="mt-7 flex flex-wrap items-center gap-3">
+          {!isConnected ? (
+            <ConnectButton />
+          ) : (
+            <>
+              {canIssue && (
+                <Link to="/issuer" className="btn-primary">
+                  <Stamp size={16} aria-hidden="true" /> Issuer workspace
+                </Link>
+              )}
+              <Link to="/holder" className={canIssue ? "btn-secondary" : "btn-primary"}>
+                <GraduationCap size={16} aria-hidden="true" /> Holder workspace
+              </Link>
+              <Link to="/verifier" className="btn-secondary">
+                <ShieldCheck size={16} aria-hidden="true" /> Verifier workspace
+              </Link>
+            </>
           )}
-          <Link className="btn-secondary max-w-xs" to="/holder">
-            Go to Holder workspace
-          </Link>
-          <Link className="btn-secondary max-w-xs" to="/verifier">
-            Go to Verifier workspace
-          </Link>
         </div>
-      )}
+      </section>
 
-      <div className="mx-auto grid max-w-4xl gap-4 pt-6 text-left md:grid-cols-3">
-        <RoleCard
-          title="Issuer"
-          body="Registered institutions approve holders and issue certificates with an on-chain commitment."
-        />
-        <RoleCard
-          title="Holder"
-          body="Request membership, receive certificates, and share selectively with a zero-knowledge GPA proof."
-        />
-        <RoleCard
-          title="Verifier"
-          body="Look up a certificate and verify a GPA-threshold proof on-chain without seeing the actual GPA."
-        />
-      </div>
-    </section>
-  );
-};
-
-function RoleCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-      <h3 className="font-semibold">{title}</h3>
-      <p className="mt-1 text-sm text-slate-400">{body}</p>
+      {/* How it works — a real ordered sequence, so the numbers carry meaning */}
+      <section>
+        <h2 className="mb-6 font-serif text-xl font-semibold text-ink">
+          How a credential flows
+        </h2>
+        <ol className="grid gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-3">
+          {flow.map(({ Icon, role, body }, i) => (
+            <li key={role} className="relative flex flex-col gap-3 bg-surface p-6">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary-tint text-primary">
+                  <Icon size={19} aria-hidden="true" />
+                </span>
+                <span className="font-mono text-sm text-ink-subtle">
+                  Step {i + 1}
+                </span>
+                {i < flow.length - 1 && (
+                  <ArrowRight
+                    size={16}
+                    className="ml-auto hidden text-ink-subtle md:block"
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold text-ink">{role}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-ink-muted">{body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
     </div>
   );
-}
+};

@@ -1,76 +1,79 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Stamp, GraduationCap, ShieldCheck } from "lucide-react";
+import clsx from "clsx";
 import { useRole } from "../context/RoleContext";
+
+const roleLinks = [
+  { to: "/issuer", label: "Issuer", Icon: Stamp, issuerOnly: true },
+  { to: "/holder", label: "Holder", Icon: GraduationCap, issuerOnly: false },
+  { to: "/verifier", label: "Verifier", Icon: ShieldCheck, issuerOnly: false },
+];
 
 export const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const { isIssuer, isAdmin, isConnected } = useRole();
   const canIssue = isIssuer || isAdmin;
-
-  const links = [
-    ...(canIssue ? [{ to: "/issuer", label: "Issuer" }] : []),
-    { to: "/holder", label: "Holder" },
-    { to: "/verifier", label: "Verifier" },
-  ];
+  const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto max-w-6xl space-y-10 px-4 py-10">
-        <header className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 shadow-2xl">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <Link
-                to="/"
-                className="text-sm uppercase tracking-widest text-secondary"
-              >
-                CERTIFY
-              </Link>
-              <h1 className="text-3xl font-bold">
-                Blockchain Academic Credentialing
-              </h1>
-              <p className="text-slate-300">ZKP + IPFS + React + Solidity</p>
-            </div>
-            <ConnectButton
-              accountStatus="address"
-              showBalance={false}
-              chainStatus="icon"
-            />
-          </div>
-        </header>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-[1100] border-b border-line bg-paper/85 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+          <Link to="/" className="group flex items-center gap-2.5" aria-label="Certify home">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-white shadow-xs">
+              <ShieldCheck size={18} strokeWidth={2.25} aria-hidden="true" />
+            </span>
+            <span className="leading-none">
+              <span className="block font-serif text-lg font-semibold tracking-tight text-ink">
+                Certify
+              </span>
+              <span className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-ink-subtle">
+                Credential Registry
+              </span>
+            </span>
+          </Link>
 
-        <nav className="flex flex-wrap gap-3" aria-label="Primary">
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              `rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                isActive
-                  ? "bg-secondary text-slate-950"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`
-            }
-            end
+          <ConnectButton
+            accountStatus="address"
+            showBalance={false}
+            chainStatus="icon"
+          />
+        </div>
+
+        {isConnected && (
+          <nav
+            className="mx-auto flex max-w-6xl items-center gap-1 px-4 sm:px-6"
+            aria-label="Workspaces"
           >
-            Home
-          </NavLink>
-          {isConnected &&
-            links.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                    isActive
-                      ? "bg-primary text-white"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-        </nav>
+            {roleLinks
+              .filter((l) => !l.issuerOnly || canIssue)
+              .map(({ to, label, Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    clsx(
+                      "-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "border-primary text-ink"
+                        : "border-transparent text-ink-subtle hover:text-ink"
+                    )
+                  }
+                >
+                  <Icon size={16} aria-hidden="true" />
+                  {label}
+                </NavLink>
+              ))}
+          </nav>
+        )}
+      </header>
 
+      <main
+        key={location.pathname}
+        className="mx-auto max-w-6xl animate-fade-up px-4 py-8 sm:px-6 sm:py-10"
+      >
         {children}
-      </div>
+      </main>
     </div>
   );
 };

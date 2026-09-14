@@ -1,12 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import toast from "react-hot-toast";
+import { Search, ShieldCheck, Cpu, FileCheck, History, CircleCheck } from "lucide-react";
 
 import { useDisclosures } from "../hooks/useCertificates";
 import { useRegistryWrite } from "../hooks/useRegistryWrite";
 import { publicClient, registryContract } from "../lib/contract";
 import { fetchFromIpfs, ipfsUrl } from "../lib/ipfs";
-import { Notice, Spinner } from "./Shared";
+import {
+  DataChip,
+  EmptyState,
+  Field,
+  Notice,
+  PageHeader,
+  Spinner,
+  StatusBadge,
+} from "./Shared";
 import { CertificateStatus } from "../types";
 import {
   generateGpaProof,
@@ -16,7 +25,6 @@ import {
   CertificateMetadata,
   ZKProof,
 } from "../lib/zkp";
-import { useEffect } from "react";
 
 interface Cert {
   id: bigint;
@@ -67,15 +75,7 @@ export const VerifierDashboard = () => {
         ...registryContract,
         functionName: "certificates",
         args: [BigInt(certificateId)],
-      })) as readonly [
-        bigint,
-        string,
-        string,
-        string,
-        `0x${string}`,
-        number,
-        bigint
-      ];
+      })) as readonly [bigint, string, string, string, `0x${string}`, number, bigint];
       if (data[1] === "0x0000000000000000000000000000000000000000") {
         throw new Error("Certificate not found");
       }
@@ -106,7 +106,7 @@ export const VerifierDashboard = () => {
     if (!metadata) return toast.error("Load a certificate first");
     if (!metadata.secret) {
       return toast.error(
-        "This certificate's metadata has no ZK secret (issued before the ZK upgrade)."
+        "This certificate has no ZK secret (issued before the ZK upgrade)."
       );
     }
     setZkLoading(true);
@@ -115,7 +115,7 @@ export const VerifierDashboard = () => {
       const proof = await generateGpaProof(metadata, minGpa);
       setZkProof(proof);
       setLocalVerified(await verifyProof(proof));
-      toast.success("Proof generated & locally verified");
+      toast.success("Proof generated & self-verified");
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to generate proof");
     } finally {
@@ -128,11 +128,10 @@ export const VerifierDashboard = () => {
     setIsVerifying(true);
     try {
       const { a, b, c, pubSignals } = formatProofForSolidity(zkProof);
-      await write(
-        "verifySelectiveProof",
-        [cert.id, a, b, c, pubSignals],
-        { pending: "Verifying proof on-chain…", success: "Proof verified on-chain ✅" }
-      );
+      await write("verifySelectiveProof", [cert.id, a, b, c, pubSignals], {
+        pending: "Verifying proof on-chain…",
+        success: "Proof verified on-chain",
+      });
     } catch {
       /* toast shown by useRegistryWrite */
     } finally {
@@ -141,127 +140,115 @@ export const VerifierDashboard = () => {
   };
 
   return (
-    <section className="space-y-6">
-      <header>
-        <h2 className="text-xl font-semibold">Verifier Workspace</h2>
-        <p className="text-sm text-slate-300">
-          Look up a certificate, then generate and verify a GPA-threshold proof.
-        </p>
-      </header>
+    <section>
+      <PageHeader
+        icon={<ShieldCheck size={22} aria-hidden="true" />}
+        eyebrow="Workspace"
+        title="Verifier"
+        description="Look up a credential and verify a GPA threshold on-chain — without seeing the GPA."
+      />
 
       {zkFilesOk === false && (
-        <Notice tone="warning" title="ZK artifacts missing">
-          <code>certify.wasm</code>/<code>certify.zkey</code> not found in{" "}
-          <code>public/zk/</code>. Run <code>cd zk &amp;&amp; ./build.sh</code> to
-          build the circuit before generating proofs.
-        </Notice>
+        <div className="mb-6">
+          <Notice tone="warning" title="ZK artifacts not built">
+            <code>certify.wasm</code> / <code>certify.zkey</code> are missing from{" "}
+            <code>public/zk/</code>. Run <code>cd zk &amp;&amp; ./build.sh</code>{" "}
+            before generating proofs.
+          </Notice>
+        </div>
       )}
 
       {/* Search */}
-      <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-        <h3 className="font-semibold">Search Certificate</h3>
-        <div className="flex flex-col gap-3 md:flex-row">
+      <div className="panel-pad">
+        <div className="mb-4 flex items-center gap-2">
+          <Search size={17} className="text-primary" aria-hidden="true" />
+          <h2 className="font-semibold text-ink">Find a certificate</h2>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             className="input flex-1"
             placeholder="Certificate ID"
             value={certificateId}
             onChange={(e) => setCertificateId(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onSearch()}
           />
-          <button className="btn-primary md:w-40" onClick={onSearch} disabled={isSearching}>
+          <button className="btn-primary sm:w-36" onClick={onSearch} disabled={isSearching}>
+            <Search size={16} aria-hidden="true" />
             {isSearching ? "Searching…" : "Search"}
           </button>
         </div>
 
         {cert && (
-          <div className="space-y-3">
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-slate-400">ID</dt>
-                <dd className="font-mono">{cert.id.toString()}</dd>
+          <div className="mt-5 rounded-lg border border-line bg-sunken/40 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {metadata ? (
+                  <>
+                    <h3 className="font-serif text-xl font-semibold text-ink">
+                      {metadata.name}
+                    </h3>
+                    <p className="text-sm text-ink-muted">
+                      {metadata.program} · {metadata.institution}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-ink-muted">
+                    Certificate №{cert.id.toString().padStart(4, "0")}
+                  </p>
+                )}
               </div>
-              <div>
-                <dt className="text-slate-400">Status</dt>
-                <dd>{cert.status}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">Issuer</dt>
-                <dd className="break-all font-mono text-xs">{cert.issuer}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">Holder</dt>
-                <dd className="break-all font-mono text-xs">{cert.holder}</dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-slate-400">Metadata CID</dt>
-                <dd>
-                  <a
-                    className="text-primary text-xs break-all"
-                    target="_blank"
-                    rel="noreferrer"
-                    href={ipfsUrl(cert.metadataCid)}
-                  >
-                    {cert.metadataCid}
-                  </a>
-                </dd>
-              </div>
+              <StatusBadge status={cert.status} />
+            </div>
+            <dl className="mt-4 flex flex-wrap gap-2">
+              <DataChip label="issuer" value={cert.issuer} />
+              <DataChip label="holder" value={cert.holder} />
+              <DataChip label="cid" value={cert.metadataCid} href={ipfsUrl(cert.metadataCid)} />
             </dl>
-
-            {metadata && (
-              <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
-                <h4 className="mb-2 text-sm font-semibold">Certificate Details</h4>
-                <dl className="grid grid-cols-2 gap-2 text-xs">
-                  <div><dt className="text-slate-400">Name</dt><dd>{metadata.name}</dd></div>
-                  <div><dt className="text-slate-400">Institution</dt><dd>{metadata.institution}</dd></div>
-                  <div><dt className="text-slate-400">Program</dt><dd>{metadata.program}</dd></div>
-                  <div>
-                    <dt className="text-slate-400">GPA</dt>
-                    <dd className="font-semibold text-green-400">{metadata.gpa}</dd>
-                  </div>
-                </dl>
-              </div>
-            )}
           </div>
         )}
       </div>
 
       {/* Proof */}
       {metadata && (
-        <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <h3 className="font-semibold">Generate GPA Proof</h3>
-          <label className="block space-y-1">
-            <span className="text-sm text-slate-400">Minimum GPA to prove (0–5)</span>
-            <input
-              className="input"
-              type="number"
-              step="0.01"
-              min="0"
-              max="5"
-              value={minGpa}
-              onChange={(e) => setMinGpa(e.target.value)}
-            />
-          </label>
-          <p className="text-xs text-slate-500">
-            Proves GPA ≥ {minGpa} without revealing the actual value.
-          </p>
+        <div className="panel-pad mt-6 space-y-5">
+          <div className="flex items-center gap-2">
+            <Cpu size={17} className="text-primary" aria-hidden="true" />
+            <h2 className="font-semibold text-ink">Prove a GPA threshold</h2>
+          </div>
 
-          <button
-            className="btn-secondary w-full"
-            onClick={onGenerateProof}
-            disabled={zkLoading || zkFilesOk === false}
-          >
-            {zkLoading ? "Generating…" : "Generate Proof"}
-          </button>
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <Field label="Minimum GPA to prove" hint={`Proves GPA ≥ ${minGpa} without revealing it`}>
+              <input
+                className="input"
+                type="number"
+                step="0.01"
+                min="0"
+                max="5"
+                value={minGpa}
+                onChange={(e) => setMinGpa(e.target.value)}
+              />
+            </Field>
+            <button
+              className="btn-secondary"
+              onClick={onGenerateProof}
+              disabled={zkLoading || zkFilesOk === false}
+            >
+              <Cpu size={16} aria-hidden="true" />
+              {zkLoading ? "Generating…" : "Generate proof"}
+            </button>
+          </div>
 
           {zkLoading && <Spinner label="Computing zero-knowledge proof…" />}
 
           {zkProof && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-green-800 bg-green-900/20 p-3">
-                <p className="text-sm text-green-400">✅ Proof generated</p>
+            <div className="space-y-4 rounded-lg border border-valid/25 bg-valid-tint p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                <CircleCheck size={16} className="text-valid-ink" aria-hidden="true" />
+                Proof generated
                 {localVerified !== null && (
-                  <p className="text-xs text-slate-400">
-                    Local verification: {localVerified ? "✓ passed" : "✗ failed"}
-                  </p>
+                  <span className="text-ink-muted">
+                    · self-verify {localVerified ? "passed" : "failed"}
+                  </span>
                 )}
               </div>
               <button
@@ -269,10 +256,11 @@ export const VerifierDashboard = () => {
                 onClick={onVerifyOnChain}
                 disabled={isVerifying || !isConnected}
               >
-                {isVerifying ? "Verifying…" : "Verify Proof On-Chain"}
+                <FileCheck size={16} aria-hidden="true" />
+                {isVerifying ? "Verifying…" : "Verify on-chain"}
               </button>
               {!isConnected && (
-                <p className="text-xs text-yellow-400">
+                <p className="text-xs text-pending-ink">
                   Connect a wallet to submit the on-chain verification.
                 </p>
               )}
@@ -282,43 +270,37 @@ export const VerifierDashboard = () => {
       )}
 
       {/* Disclosures */}
-      <div className="space-y-3">
-        <h3 className="font-semibold">Disclosures</h3>
-        <ul className="space-y-3">
-          {disclosures && disclosures.length > 0 ? (
-            disclosures.map((d: any, idx: number) => (
+      <div className="mt-10">
+        <div className="mb-4 flex items-center gap-2">
+          <History size={17} className="text-primary" aria-hidden="true" />
+          <h2 className="font-serif text-xl font-semibold text-ink">
+            Disclosure history
+          </h2>
+        </div>
+        {disclosures && disclosures.length > 0 ? (
+          <ul className="space-y-3">
+            {disclosures.map((d: any, idx: number) => (
               <li
                 key={`${d.verifier}-${d.timestamp.toString()}-${idx}`}
-                className="space-y-1 rounded-lg border border-slate-800 p-3 text-sm"
+                className="panel space-y-2 p-4"
               >
-                <p className="break-all font-mono text-xs">
-                  <span className="text-slate-400">Verifier:</span> {d.verifier}
-                </p>
-                <p className="break-all font-mono text-xs">
-                  <span className="text-slate-400">Query Hash:</span> {d.queryHash}
-                </p>
-                {d.encryptedPayloadCid && (
-                  <p className="font-mono text-xs">
-                    <span className="text-slate-400">Encrypted CID:</span>{" "}
-                    <a
-                      href={ipfsUrl(d.encryptedPayloadCid)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary"
-                    >
-                      {d.encryptedPayloadCid}
-                    </a>
-                  </p>
-                )}
-                <p className="text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DataChip label="verifier" value={d.verifier} />
+                  {d.encryptedPayloadCid && (
+                    <DataChip label="payload" value={d.encryptedPayloadCid} href={ipfsUrl(d.encryptedPayloadCid)} />
+                  )}
+                </div>
+                <p className="font-mono text-[0.7rem] text-ink-subtle">
                   {new Date(Number(d.timestamp) * 1000).toLocaleString()}
                 </p>
               </li>
-            ))
-          ) : (
-            <p className="text-sm text-slate-400">No disclosures yet.</p>
-          )}
-        </ul>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState icon={<History size={26} />} title="No disclosures yet">
+            Search a certificate above to see who it has been shared with.
+          </EmptyState>
+        )}
       </div>
     </section>
   );

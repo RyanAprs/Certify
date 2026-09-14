@@ -1,16 +1,29 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Wallet, Lock, ArrowLeft } from "lucide-react";
 import { useRole } from "../context/RoleContext";
 import { isContractConfigured } from "../lib/contract";
+import { Notice, Spinner } from "./Shared";
 
 type RequiredRole = "issuer" | "holder" | "verifier";
 
-/**
- * Enforces per-page access from ON-CHAIN state instead of a self-selected
- * label. Holder/Verifier pages need only a connected wallet; the Issuer page
- * additionally requires the wallet to be a registered issuer (or admin).
- */
+const LABELS: Record<RequiredRole, string> = {
+  issuer: "Issuer",
+  holder: "Holder",
+  verifier: "Verifier",
+};
+
+function Gate({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-md">
+      <div className="panel-pad animate-scale-in flex flex-col items-center gap-5 text-center">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export const RoleGuard = ({
   role,
   children,
@@ -22,59 +35,64 @@ export const RoleGuard = ({
 
   if (!isContractConfigured()) {
     return (
-      <div className="rounded-xl border border-yellow-800 bg-yellow-900/20 p-8 space-y-2">
-        <h2 className="text-lg font-bold text-yellow-200">Contract not configured</h2>
-        <p className="text-sm text-yellow-300">
+      <div className="mx-auto max-w-lg">
+        <Notice tone="warning" title="Contract not configured">
           The registry address is empty. Deploy the contracts with{" "}
-          <code>npm run deploy:local</code> inside <code>contracts/</code> (this
-          writes <code>frontend/src/lib/deployment.json</code>), then reload.
-        </p>
+          <code>npm run deploy:local</code> inside <code>contracts/</code> — it
+          writes <code>deployment.json</code> — then reload.
+        </Notice>
       </div>
     );
   }
 
   if (!isConnected) {
     return (
-      <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/50 p-8 text-center">
-        <p className="text-slate-300">
-          Connect your wallet to access the {role} workspace.
-        </p>
-        <div className="flex justify-center">
-          <ConnectButton />
+      <Gate>
+        <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary-tint text-primary">
+          <Wallet size={22} aria-hidden="true" />
+        </span>
+        <div>
+          <h2 className="font-serif text-xl font-semibold text-ink">
+            Connect your wallet
+          </h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            The {LABELS[role]} workspace signs actions with your wallet on the
+            Hardhat network (chain 31337).
+          </p>
         </div>
-      </div>
+        <ConnectButton />
+      </Gate>
     );
   }
 
   if (role === "issuer") {
     if (roleLoading) {
       return (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-8 text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-          <p className="mt-4 text-slate-400">Checking issuer role…</p>
-        </div>
+        <Gate>
+          <Spinner label="Checking issuer authorization…" />
+        </Gate>
       );
     }
     if (!isIssuer && !isAdmin) {
       return (
-        <div className="space-y-4 rounded-xl border border-red-800 bg-red-900/20 p-8">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🚫</span>
-            <div>
-              <h2 className="text-lg font-bold text-red-300">Access denied</h2>
-              <p className="text-sm text-red-400">
-                This wallet is not a registered issuer. The registry admin must
-                call <code>registerIssuer(yourAddress)</code> first.
-              </p>
-            </div>
+        <Gate>
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-danger-tint text-danger-ink">
+            <Lock size={22} aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="font-serif text-xl font-semibold text-ink">
+              Not a registered issuer
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              This wallet can't issue certificates yet. The registry admin must
+              call <code className="rounded bg-sunken px-1 py-0.5 font-mono text-[0.8em]">registerIssuer(yourAddress)</code>{" "}
+              to authorize you.
+            </p>
           </div>
-          <Link
-            to="/"
-            className="inline-block rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-600"
-          >
-            ← Back to Home
+          <Link to="/" className="btn-ghost">
+            <ArrowLeft size={16} aria-hidden="true" /> Back to overview
           </Link>
-        </div>
+        </Gate>
       );
     }
   }

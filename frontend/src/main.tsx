@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import { Toaster } from "react-hot-toast";
 import App from "./pages/App";
 import { wagmiConfig } from "./lib/wagmi";
@@ -17,7 +17,14 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={darkTheme()}>
+        <RainbowKitProvider
+          theme={lightTheme({
+            accentColor: "#3d4dcc",
+            accentColorForeground: "white",
+            borderRadius: "medium",
+            fontStack: "system",
+          })}
+        >
           <BrowserRouter>
             <RoleProvider>
               <App />
@@ -26,9 +33,11 @@ createRoot(document.getElementById("root")!).render(
               position="top-right"
               toastOptions={{
                 style: {
-                  background: "#0f172a",
-                  color: "#e2e8f0",
-                  border: "1px solid #1e293b",
+                  background: "oklch(1 0 0)",
+                  color: "oklch(0.24 0.02 262)",
+                  border: "1px solid oklch(0.906 0.004 262)",
+                  boxShadow: "0 8px 24px oklch(0.24 0.02 262 / 0.1)",
+                  fontSize: "0.875rem",
                 },
               }}
             />
