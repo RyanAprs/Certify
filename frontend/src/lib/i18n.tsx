@@ -46,6 +46,10 @@ const en: Dict = {
   "guard.denied.title": "Not a registered issuer",
   "guard.denied.body":
     "This wallet can't issue certificates yet. The registry admin must authorize it.",
+  "guard.noFunds.title": "This wallet has no ETH",
+  "guard.noFunds.body":
+    "It can't pay gas on the local chain. Send ETH to it from a funded Hardhat account (e.g. Account #0), or connect a funded account.",
+  "guard.retry": "I've funded it — retry",
 
   // issuer
   "issuer.desc": "Issue academic and competency credentials, and manage which holders can receive them.",
@@ -249,6 +253,10 @@ const id: Dict = {
   "guard.denied.title": "Bukan penerbit terdaftar",
   "guard.denied.body":
     "Wallet ini belum bisa menerbitkan sertifikat. Admin registry harus mengotorisasinya.",
+  "guard.noFunds.title": "Wallet ini belum punya ETH",
+  "guard.noFunds.body":
+    "Tak bisa bayar gas di chain lokal. Kirim ETH dari akun Hardhat yang berdana (mis. Account #0), atau hubungkan akun yang sudah berisi ETH.",
+  "guard.retry": "Sudah diisi — coba lagi",
 
   "issuer.desc": "Terbitkan kredensial akademik & kompetensi, dan kelola holder yang boleh menerimanya.",
   "admin.title": "Admin · registri penerbit",
