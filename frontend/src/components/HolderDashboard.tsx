@@ -23,6 +23,7 @@ import { uploadJson, fetchFromIpfs } from "../lib/ipfs";
 import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
 import { getSchema } from "../lib/schemas";
 import { CredentialMetadata } from "../lib/zkp";
+import { useT } from "../lib/i18n";
 
 interface MembershipForm {
   issuer: string;
@@ -64,6 +65,7 @@ export const HolderDashboard = () => {
     useHolderCertificates(address);
   const { data: memberships } = useMemberships(address);
   const { write } = useRegistryWrite();
+  const { t } = useT();
 
   const [isRequesting, setIsRequesting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -177,16 +179,16 @@ export const HolderDashboard = () => {
     <section>
       <PageHeader
         icon={<GraduationCap size={22} aria-hidden="true" />}
-        eyebrow="Workspace"
-        title="Holder"
-        description="Collect your credentials and share exactly what a verifier needs — nothing more."
-        aside={address ? <DataChip label="signed in" value={address} /> : undefined}
+        eyebrow={t("workspace")}
+        title={t("nav.holder")}
+        description={t("holder.desc")}
+        aside={address ? <DataChip label={t("signedIn")} value={address} /> : undefined}
       />
 
       {memberships && memberships.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-valid/25 bg-valid-tint px-4 py-3">
           <BadgeCheck size={16} className="text-valid-ink" aria-hidden="true" />
-          <span className="text-sm font-medium text-ink">Member of</span>
+          <span className="text-sm font-medium text-ink">{t("holder.memberOf")}</span>
           {memberships.map((m) => (
             <DataChip key={m} value={m} />
           ))}
@@ -197,13 +199,13 @@ export const HolderDashboard = () => {
       <form onSubmit={onMembership} className="panel-pad mb-6 space-y-4">
         <div className="flex items-center gap-2">
           <UserPlus size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-semibold text-ink">Join an issuer</h2>
+          <h2 className="font-semibold text-ink">{t("join.title")}</h2>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="flex-1">
             <input
               className="input-mono"
-              placeholder="Issuer address (0x…)"
+              placeholder={t("join.placeholder")}
               disabled={isRequesting}
               {...membershipForm.register("issuer", {
                 required: "Issuer address is required",
@@ -218,7 +220,7 @@ export const HolderDashboard = () => {
           </div>
           <button className="btn-primary sm:w-44" disabled={isRequesting}>
             <UserPlus size={16} aria-hidden="true" />
-            {isRequesting ? "Requesting…" : "Request access"}
+            {isRequesting ? t("join.requesting") : t("join.request")}
           </button>
         </div>
       </form>
@@ -227,17 +229,17 @@ export const HolderDashboard = () => {
       <div className="panel-pad space-y-5">
         <div className="flex items-center gap-2">
           <Share2 size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-semibold text-ink">Share a credential</h2>
+          <h2 className="font-semibold text-ink">{t("share.title")}</h2>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Credential">
+          <Field label={t("share.credential")}>
             <select
               className="input"
               value={shareId}
               onChange={(e) => setShareId(e.target.value)}
             >
-              <option value="">Select a credential…</option>
+              <option value="">{t("share.select")}</option>
               {certificates?.map((c) => {
                 const s = getSchema(c.schemaId);
                 return (
@@ -248,7 +250,7 @@ export const HolderDashboard = () => {
               })}
             </select>
           </Field>
-          <Field label="Verifier address">
+          <Field label={t("share.verifier")}>
             <input
               className="input-mono"
               placeholder="0x…"
@@ -267,7 +269,7 @@ export const HolderDashboard = () => {
         ) : (
           <>
             <div>
-              <span className="label">Fields to disclose</span>
+              <span className="label">{t("share.fields")}</span>
               <div className="flex flex-wrap gap-2">
                 {fields.map((f) => {
                   const on = selected.has(f.key);
@@ -317,9 +319,7 @@ export const HolderDashboard = () => {
 
       {/* Certificates */}
       <div className="mt-10">
-        <h2 className="mb-4 font-serif text-xl font-semibold text-ink">
-          Your credentials
-        </h2>
+        <h2 className="mb-4 font-serif text-xl font-semibold text-ink">{t("creds.title")}</h2>
         {certsLoading ? (
           <div className="grid gap-5 md:grid-cols-2">
             <SkeletonCard />
@@ -332,7 +332,7 @@ export const HolderDashboard = () => {
             ))}
           </div>
         ) : (
-          <EmptyState icon={<FileText size={28} />} title="No credentials yet">
+          <EmptyState icon={<FileText size={28} />} title={t("creds.empty")}>
             Once an issuer you've joined grants you a certificate, it will appear
             here — ready to share.
           </EmptyState>

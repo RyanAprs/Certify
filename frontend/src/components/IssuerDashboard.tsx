@@ -9,7 +9,9 @@ import clsx from "clsx";
 
 import { useIssuerCertificates } from "../hooks/useCertificates";
 import { useRegistryWrite } from "../hooks/useRegistryWrite";
+import { useMemberRequests } from "../hooks/useMemberRequests";
 import { useRole } from "../context/RoleContext";
+import { useT } from "../lib/i18n";
 import {
   CertificateCard,
   DataChip,
@@ -30,45 +32,6 @@ type IssueForm = {
   claims: Record<string, string>;
   image: FileList;
 };
-
-function useMemberRequests(issuer?: `0x${string}`) {
-  return useQuery({
-    enabled: Boolean(issuer),
-    queryKey: ["memberRequests", issuer],
-    queryFn: async () => {
-      if (!issuer) return { pending: [] as string[], approved: [] as string[] };
-      const logs = await publicClient.getLogs({
-        address: registryContract.address,
-        event: parseAbiItem(
-          "event MemberRequested(address indexed issuer, address indexed holder)"
-        ),
-        args: { issuer },
-        fromBlock: deploymentBlock,
-        toBlock: "latest",
-      });
-      const holders = [
-        ...new Set(logs.map((l) => (l.args.holder as string).toLowerCase())),
-      ];
-      const results = await Promise.all(
-        holders.map(async (holder) => {
-          const req = (await publicClient.readContract({
-            ...registryContract,
-            functionName: "memberRequests",
-            args: [issuer, holder as `0x${string}`],
-          })) as readonly [string, boolean, boolean];
-          const [, approved, decided] = req;
-          return { holder, approved, decided };
-        })
-      );
-      return {
-        pending: results.filter((r) => !r.decided).map((r) => r.holder),
-        approved: results
-          .filter((r) => r.decided && r.approved)
-          .map((r) => r.holder),
-      };
-    },
-  });
-}
 
 function useRegisteredIssuers() {
   return useQuery({
@@ -110,6 +73,7 @@ export const IssuerDashboard = () => {
   } = useMemberRequests(address);
   const { write } = useRegistryWrite();
   const { isAdmin, refreshRole } = useRole();
+  const { t } = useT();
   const { data: issuers, refetch: refetchIssuers } = useRegisteredIssuers();
 
   const [schema, setSchema] = useState<Schema>(SCHEMAS[0]);
@@ -224,25 +188,25 @@ export const IssuerDashboard = () => {
     <section>
       <PageHeader
         icon={<Stamp size={22} aria-hidden="true" />}
-        eyebrow="Workspace"
-        title="Issuer"
-        description="Issue academic and competency credentials, and manage which holders can receive them."
-        aside={address ? <DataChip label="signed in" value={address} /> : undefined}
+        eyebrow={t("workspace")}
+        title={t("nav.issuer")}
+        description={t("issuer.desc")}
+        aside={address ? <DataChip label={t("signedIn")} value={address} /> : undefined}
       />
 
       {isAdmin && (
         <div className="panel-pad mb-6 border-primary/30 bg-primary-tint/40">
           <div className="mb-1 flex items-center gap-2">
             <ShieldPlus size={17} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-ink">Admin · issuer registry</h2>
+            <h2 className="font-semibold text-ink">{t("admin.title")}</h2>
           </div>
           <p className="mb-4 text-sm text-ink-muted">
-            Authorize another wallet to issue credentials.
+            {t("admin.desc")}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
               className="input-mono flex-1"
-              placeholder="0x… wallet to authorize"
+              placeholder={t("admin.placeholder")}
               value={issuerAddr}
               onChange={(e) => setIssuerAddr(e.target.value)}
             />
@@ -252,13 +216,13 @@ export const IssuerDashboard = () => {
               disabled={registering}
             >
               <ShieldPlus size={16} aria-hidden="true" />
-              {registering ? "Registering…" : "Register issuer"}
+              {registering ? t("admin.registering") : t("admin.register")}
             </button>
           </div>
           {issuers && issuers.length > 0 && (
             <div className="mt-4">
               <p className="mb-2 text-xs font-medium text-ink-subtle">
-                Registered issuers
+                {t("admin.registered")}
               </p>
               <ul className="flex flex-wrap gap-2">
                 {issuers.map((a) => (
@@ -287,12 +251,12 @@ export const IssuerDashboard = () => {
         <form onSubmit={onIssue} className="panel-pad space-y-4">
           <div className="flex items-center gap-2">
             <FileText size={17} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-ink">Issue a credential</h2>
+            <h2 className="font-semibold text-ink">{t("issue.title")}</h2>
           </div>
 
           {/* Credential type */}
           <div>
-            <span className="label">Credential type</span>
+            <span className="label">{t("issue.type")}</span>
             <div className="grid grid-cols-2 gap-2">
               {SCHEMAS.map((s) => (
                 <button
@@ -316,7 +280,7 @@ export const IssuerDashboard = () => {
             </div>
           </div>
 
-          <Field label="Holder address" error={errors.holder?.message}>
+          <Field label={t("issue.holder")} error={errors.holder?.message}>
             <input
               className="input-mono"
               placeholder="0x…"
@@ -355,7 +319,7 @@ export const IssuerDashboard = () => {
           {/* Provable claims (private) */}
           <div className="rounded-lg border border-line bg-sunken/40 p-4">
             <p className="mb-3 text-sm font-medium text-ink">
-              Private claims{" "}
+              {t("issue.claimsTitle")}{" "}
               <span className="font-normal text-ink-subtle">
                 — committed on-chain, provable by threshold, never revealed
               </span>
@@ -404,7 +368,7 @@ export const IssuerDashboard = () => {
             </div>
           </div>
 
-          <Field label="Certificate image" hint="PNG or JPEG, stored on IPFS">
+          <Field label={t("issue.image")} hint="PNG or JPEG, stored on IPFS">
             <input
               className="input file:mr-3 file:rounded file:border-0 file:bg-sunken file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
               type="file"
@@ -416,7 +380,7 @@ export const IssuerDashboard = () => {
 
           <button className="btn-primary w-full" disabled={isIssuing}>
             <Stamp size={16} aria-hidden="true" />
-            {isIssuing ? "Issuing…" : `Issue ${schema.label.toLowerCase()}`}
+            {isIssuing ? t("issue.submitting") : t("issue.submit", { type: schema.label.toLowerCase() })}
           </button>
         </form>
 
@@ -426,7 +390,7 @@ export const IssuerDashboard = () => {
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Inbox size={17} className="text-primary" aria-hidden="true" />
-                <h2 className="font-semibold text-ink">Pending requests</h2>
+                <h2 className="font-semibold text-ink">{t("pending.title")}</h2>
               </div>
               <button
                 onClick={() => {
@@ -436,7 +400,7 @@ export const IssuerDashboard = () => {
                 disabled={membersLoading}
                 className="text-xs font-semibold text-primary transition hover:text-primary-hover disabled:opacity-50"
               >
-                {membersLoading ? "Refreshing…" : "Refresh"}
+                {membersLoading ? t("common.refreshing") : t("common.refresh")}
               </button>
             </div>
 
@@ -446,7 +410,7 @@ export const IssuerDashboard = () => {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : (members?.pending.length ?? 0) === 0 ? (
-              <EmptyState icon={<Inbox size={26} />} title="No pending requests">
+              <EmptyState icon={<Inbox size={26} />} title={t("pending.empty")}>
                 When a holder requests membership, they'll appear here for approval.
               </EmptyState>
             ) : (
@@ -464,7 +428,7 @@ export const IssuerDashboard = () => {
                         className="btn-secondary flex-1 sm:flex-none"
                       >
                         <UserCheck size={15} aria-hidden="true" />
-                        {processing === holder ? "…" : "Approve"}
+                        {processing === holder ? "…" : t("approve")}
                       </button>
                       <button
                         onClick={() => onDecision(holder, false)}
@@ -483,10 +447,10 @@ export const IssuerDashboard = () => {
           <div className="panel-pad">
             <div className="mb-4 flex items-center gap-2">
               <Users size={17} className="text-primary" aria-hidden="true" />
-              <h2 className="font-semibold text-ink">Approved members</h2>
+              <h2 className="font-semibold text-ink">{t("members.title")}</h2>
             </div>
             {(members?.approved.length ?? 0) === 0 ? (
-              <p className="text-sm text-ink-subtle">No approved members yet.</p>
+              <p className="text-sm text-ink-subtle">{t("members.empty")}</p>
             ) : (
               <ul className="flex flex-wrap gap-2">
                 {members?.approved.map((member) => (
@@ -503,7 +467,7 @@ export const IssuerDashboard = () => {
       {/* Issued certificates */}
       <div className="mt-10">
         <h2 className="mb-4 font-serif text-xl font-semibold text-ink">
-          Issued credentials
+          {t("issued.title")}
         </h2>
         {certsLoading ? (
           <div className="grid gap-5 md:grid-cols-2">
@@ -517,7 +481,7 @@ export const IssuerDashboard = () => {
             ))}
           </div>
         ) : (
-          <EmptyState icon={<FileText size={28} />} title="No credentials issued yet">
+          <EmptyState icon={<FileText size={28} />} title={t("issued.empty")}>
             Approve a holder above, then issue their first credential. It will be
             recorded on-chain with a zero-knowledge commitment.
           </EmptyState>

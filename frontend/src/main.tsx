@@ -8,6 +8,7 @@ import { Toaster } from "react-hot-toast";
 import App from "./pages/App";
 import { wagmiConfig } from "./lib/wagmi";
 import { RoleProvider } from "./context/RoleContext";
+import { LocaleProvider } from "./lib/i18n";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./styles/index.css";
 
@@ -26,9 +27,11 @@ createRoot(document.getElementById("root")!).render(
           })}
         >
           <BrowserRouter>
-            <RoleProvider>
-              <App />
-            </RoleProvider>
+            <LocaleProvider>
+              <RoleProvider>
+                <App />
+              </RoleProvider>
+            </LocaleProvider>
             <Toaster
               position="top-right"
               toastOptions={{

@@ -11,6 +11,7 @@ import { fetchFromIpfs, ipfsUrl } from "../lib/ipfs";
 import { DataChip, EmptyState, Field, Notice, PageHeader, Spinner, StatusBadge } from "./Shared";
 import { CertificateStatus } from "../types";
 import { getSchema, Schema, Predicate } from "../lib/schemas";
+import { useT } from "../lib/i18n";
 import {
   generateRangeProof,
   generateEqualityProof,
@@ -45,6 +46,7 @@ const PREDICATE_LABEL: Record<Predicate, string> = {
 export const VerifierDashboard = () => {
   const { isConnected } = useAccount();
   const { write } = useRegistryWrite();
+  const { t } = useT();
 
   const [certificateId, setCertificateId] = useState("");
   const [cert, setCert] = useState<Cert | null>(null);
@@ -197,14 +199,14 @@ export const VerifierDashboard = () => {
     <section>
       <PageHeader
         icon={<ShieldCheck size={22} aria-hidden="true" />}
-        eyebrow="Workspace"
-        title="Verifier"
-        description="Look up a credential and verify a claim on-chain — without seeing the underlying value."
+        eyebrow={t("workspace")}
+        title={t("nav.verifier")}
+        description={t("verifier.desc")}
       />
 
       {zkFilesOk === false && (
         <div className="mb-6">
-          <Notice tone="warning" title="ZK artifacts not built">
+          <Notice tone="warning" title={t("zk.missing.title")}>
             <code>range.*</code> / <code>equality.*</code> are missing from{" "}
             <code>public/zk/</code>. Run <code>cd zk &amp;&amp; ./build.sh</code> before generating proofs.
           </Notice>
@@ -215,19 +217,19 @@ export const VerifierDashboard = () => {
       <div className="panel-pad">
         <div className="mb-4 flex items-center gap-2">
           <Search size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-semibold text-ink">Find a credential</h2>
+          <h2 className="font-semibold text-ink">{t("search.title")}</h2>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             className="input flex-1"
-            placeholder="Certificate ID"
+            placeholder={t("search.placeholder")}
             value={certificateId}
             onChange={(e) => setCertificateId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSearch()}
           />
           <button className="btn-primary sm:w-36" onClick={onSearch} disabled={isSearching}>
             <Search size={16} aria-hidden="true" />
-            {isSearching ? "Searching…" : "Search"}
+            {isSearching ? t("search.searching") : t("search.button")}
           </button>
         </div>
 
@@ -269,13 +271,13 @@ export const VerifierDashboard = () => {
         <div className="panel-pad mt-6 space-y-5">
           <div className="flex items-center gap-2">
             <Cpu size={17} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-ink">Request a proof</h2>
+            <h2 className="font-semibold text-ink">{t("proof.title")}</h2>
           </div>
 
           {/* Claim */}
           {schema.claims.length > 1 && (
             <div>
-              <span className="label">Claim</span>
+              <span className="label">{t("proof.claim")}</span>
               <div className="flex flex-wrap gap-2">
                 {schema.claims.map((f) => (
                   <button
@@ -299,7 +301,7 @@ export const VerifierDashboard = () => {
           {/* Predicate */}
           {claimField.predicates.length > 1 && (
             <div>
-              <span className="label">Statement</span>
+              <span className="label">{t("proof.statement")}</span>
               <div className="flex flex-wrap gap-2">
                 {claimField.predicates.map((p) => (
                   <button
@@ -316,7 +318,7 @@ export const VerifierDashboard = () => {
                         : "border-line-strong text-ink-muted hover:border-primary/40"
                     )}
                   >
-                    {PREDICATE_LABEL[p]}
+                    {t(`pred.${p}`)}
                   </button>
                 ))}
               </div>
@@ -378,7 +380,7 @@ export const VerifierDashboard = () => {
               disabled={zkLoading || zkFilesOk === false}
             >
               <Cpu size={16} aria-hidden="true" />
-              {zkLoading ? "Generating…" : "Generate proof"}
+              {zkLoading ? t("proof.generating") : t("proof.generate")}
             </button>
           </div>
 
@@ -388,7 +390,7 @@ export const VerifierDashboard = () => {
             <div className="space-y-4 rounded-lg border border-valid/25 bg-valid-tint p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-ink">
                 <CircleCheck size={16} className="text-valid-ink" aria-hidden="true" />
-                Proof generated
+                {t("proof.generated")}
                 {localVerified !== null && (
                   <span className="text-ink-muted">
                     · self-verify {localVerified ? "passed" : "failed"}
@@ -401,7 +403,7 @@ export const VerifierDashboard = () => {
                 disabled={isVerifying || !isConnected}
               >
                 <FileCheck size={16} aria-hidden="true" />
-                {isVerifying ? "Verifying…" : "Verify on-chain"}
+                {isVerifying ? t("proof.verifying") : t("proof.verify")}
               </button>
               {!isConnected && (
                 <p className="text-xs text-pending-ink">
@@ -417,7 +419,7 @@ export const VerifierDashboard = () => {
       <div className="mt-10">
         <div className="mb-4 flex items-center gap-2">
           <History size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-serif text-xl font-semibold text-ink">Disclosure history</h2>
+          <h2 className="font-serif text-xl font-semibold text-ink">{t("disc.title")}</h2>
         </div>
         {disclosures && disclosures.length > 0 ? (
           <ul className="space-y-3">
@@ -439,7 +441,7 @@ export const VerifierDashboard = () => {
             ))}
           </ul>
         ) : (
-          <EmptyState icon={<History size={26} />} title="No disclosures yet">
+          <EmptyState icon={<History size={26} />} title={t("disc.empty")}>
             Search a certificate above to see who it has been shared with.
           </EmptyState>
         )}

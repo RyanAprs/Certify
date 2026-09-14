@@ -21,6 +21,7 @@ import { fetchJson, ipfsUrl } from "../lib/ipfs";
 import { getSchema } from "../lib/schemas";
 import { useRole } from "../context/RoleContext";
 import { useRegistryWrite } from "../hooks/useRegistryWrite";
+import { useT } from "../lib/i18n";
 
 /* ---------------- helpers ---------------- */
 
@@ -111,11 +112,12 @@ const STATUS: Record<CertificateStatus, { cls: string; Icon: typeof BadgeCheck; 
 };
 
 export function StatusBadge({ status }: { status: CertificateStatus }) {
-  const { cls, Icon, label } = STATUS[status];
+  const { t } = useT();
+  const { cls, Icon } = STATUS[status];
   return (
     <span className={clsx("badge", cls)}>
       <Icon size={13} aria-hidden="true" />
-      {label}
+      {t(`status.${status}`)}
     </span>
   );
 }
@@ -263,6 +265,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
   const { address } = useAccount();
   const { isAdmin } = useRole();
   const { write } = useRegistryWrite();
+  const { t } = useT();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const canManage =
@@ -321,7 +324,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
               disabled={busy}
               className="rounded-md border border-danger/30 px-2 py-0.5 text-xs font-semibold text-danger-ink transition hover:bg-danger-tint disabled:opacity-50"
             >
-              Revoke
+              {t("revoke")}
             </button>
           )}
           {canManage && certificate.status === "Revoked" && (
@@ -332,7 +335,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
               disabled={busy}
               className="rounded-md border border-valid/30 px-2 py-0.5 text-xs font-semibold text-valid-ink transition hover:bg-valid-tint disabled:opacity-50"
             >
-              Reactivate
+              {t("reactivate")}
             </button>
           )}
         </div>
