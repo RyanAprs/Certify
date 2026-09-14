@@ -2,6 +2,7 @@ import { useState } from "react";
 import { usePublicClient, useWriteContract } from "wagmi";
 import toast from "react-hot-toast";
 import { registryContract } from "../lib/contract";
+import { useT } from "../lib/i18n";
 
 /**
  * Wallet-based contract writes via the connected account (wagmi), replacing the
@@ -12,6 +13,7 @@ import { registryContract } from "../lib/contract";
 export function useRegistryWrite() {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
+  const { t } = useT();
   const [isPending, setIsPending] = useState(false);
 
   async function write(
@@ -21,20 +23,19 @@ export function useRegistryWrite() {
   ): Promise<`0x${string}`> {
     if (!publicClient) throw new Error("No RPC client available");
     setIsPending(true);
-    const toastId = toast.loading(messages?.pending ?? "Submitting transaction…");
+    const toastId = toast.loading(messages?.pending ?? t("tx.submitting"));
     try {
       const hash = await writeContractAsync({
         ...registryContract,
         functionName: functionName as any,
         args: args as any,
       });
-      toast.loading("Waiting for confirmation…", { id: toastId });
+      toast.loading(t("tx.confirming"), { id: toastId });
       await publicClient.waitForTransactionReceipt({ hash });
-      toast.success(messages?.success ?? "Transaction confirmed", { id: toastId });
+      toast.success(messages?.success ?? t("tx.confirmed"), { id: toastId });
       return hash;
     } catch (err: any) {
-      const short =
-        err?.shortMessage || err?.message || "Transaction failed";
+      const short = err?.shortMessage || err?.message || t("tx.failed");
       toast.error(short, { id: toastId });
       throw err;
     } finally {

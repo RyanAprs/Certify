@@ -65,7 +65,7 @@ export const HolderDashboard = () => {
     useHolderCertificates(address);
   const { data: memberships } = useMemberships(address);
   const { write } = useRegistryWrite();
-  const { t } = useT();
+  const { t, tt } = useT();
 
   const [isRequesting, setIsRequesting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -132,8 +132,8 @@ export const HolderDashboard = () => {
     setIsRequesting(true);
     try {
       await write("requestMembership", [values.issuer as `0x${string}`], {
-        pending: "Requesting membership…",
-        success: "Membership request sent",
+        pending: t("op.requesting"),
+        success: t("op.requested"),
       });
       membershipForm.reset();
     } catch {
@@ -144,10 +144,10 @@ export const HolderDashboard = () => {
   });
 
   const onShare = async () => {
-    if (!shareCert) return toast.error("Select a credential to share");
-    if (!isAddress(verifierAddr)) return toast.error("Enter a valid verifier address");
+    if (!shareCert) return toast.error(t("err.selectCred"));
+    if (!isAddress(verifierAddr)) return toast.error(t("valid.verifierReq"));
     const chosen = fields.filter((f) => selected.has(f.key));
-    if (chosen.length === 0) return toast.error("Select at least one field to disclose");
+    if (chosen.length === 0) return toast.error(t("err.selectField"));
 
     setIsSharing(true);
     try {
@@ -160,12 +160,12 @@ export const HolderDashboard = () => {
           disclosed,
           sharedAt: new Date().toISOString(),
         }),
-        { loading: "Uploading disclosure to IPFS…", success: "Uploaded", error: "Upload failed" }
+        { loading: t("op.uploadingDisc"), success: t("op.uploaded"), error: t("op.uploadFailed") }
       );
       await write(
         "shareCertificate",
         [shareCert.id, verifierAddr as `0x${string}`, queryHash, cid],
-        { pending: "Sharing credential…", success: "Credential shared" }
+        { pending: t("op.sharing"), success: t("op.shared") }
       );
       setVerifierAddr("");
     } catch (err: any) {
@@ -208,8 +208,8 @@ export const HolderDashboard = () => {
               placeholder={t("join.placeholder")}
               disabled={isRequesting}
               {...membershipForm.register("issuer", {
-                required: "Issuer address is required",
-                validate: (v) => isAddress(v) || "Enter a valid Ethereum address",
+                required: t("valid.issuerReq"),
+                validate: (v) => isAddress(v) || t("valid.addr"),
               })}
             />
             {membershipForm.formState.errors.issuer && (
@@ -265,7 +265,7 @@ export const HolderDashboard = () => {
             Pick one of your credentials to choose which fields to disclose.
           </p>
         ) : metaLoading ? (
-          <Spinner label="Loading credential fields…" />
+          <Spinner label={t("load.fields")} />
         ) : (
           <>
             <div>
@@ -295,7 +295,7 @@ export const HolderDashboard = () => {
                       >
                         {on && <Check size={11} strokeWidth={3} />}
                       </span>
-                      <span className="font-medium">{f.label}</span>
+                      <span className="font-medium">{tt(`field.${f.key}`, f.label)}</span>
                       <span className="max-w-[10rem] truncate text-ink-subtle">{f.value}</span>
                     </button>
                   );
@@ -303,15 +303,11 @@ export const HolderDashboard = () => {
               </div>
             </div>
 
-            <Notice tone="info">
-              Selective disclosure reveals the ticked fields <strong>in plaintext</strong>{" "}
-              to this verifier (stored on IPFS). To prove a fact <em>without</em>{" "}
-              revealing it (e.g. GPA ≥ 3.5), use the Verifier's zero-knowledge proofs instead.
-            </Notice>
+            <Notice tone="info">{t("share.notice")}</Notice>
 
             <button className="btn-primary w-full sm:w-auto" onClick={onShare} disabled={isSharing}>
               <Share2 size={16} aria-hidden="true" />
-              {isSharing ? "Sharing…" : `Share ${selected.size} field${selected.size === 1 ? "" : "s"}`}
+              {isSharing ? t("share.sharing") : t(selected.size === 1 ? "share.submit_one" : "share.submit", { n: selected.size })}
             </button>
           </>
         )}

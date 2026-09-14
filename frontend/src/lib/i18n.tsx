@@ -120,6 +120,94 @@ const en: Dict = {
   "status.Revoked": "Revoked",
   "revoke": "Revoke",
   "reactivate": "Reactivate",
+
+  // transactions (useRegistryWrite defaults)
+  "tx.submitting": "Submitting transaction…",
+  "tx.confirming": "Waiting for confirmation…",
+  "tx.confirmed": "Transaction confirmed",
+  "tx.failed": "Transaction failed",
+
+  // operations (toasts)
+  "op.registering": "Registering issuer…",
+  "op.registered": "Issuer registered",
+  "op.removing": "Removing issuer…",
+  "op.removed": "Issuer removed",
+  "op.approving": "Approving member…",
+  "op.rejecting": "Rejecting member…",
+  "op.memberApproved": "Member approved",
+  "op.memberRejected": "Member rejected",
+  "op.issuing": "Issuing certificate…",
+  "op.issued": "Certificate issued",
+  "op.uploadingImg": "Uploading image to IPFS…",
+  "op.imgUploaded": "Image uploaded",
+  "op.imgFailed": "Image upload failed",
+  "op.requesting": "Requesting membership…",
+  "op.requested": "Membership request sent",
+  "op.uploadingDisc": "Uploading disclosure to IPFS…",
+  "op.uploaded": "Uploaded",
+  "op.uploadFailed": "Upload failed",
+  "op.sharing": "Sharing credential…",
+  "op.shared": "Credential shared",
+  "op.verifyingChain": "Verifying proof on-chain…",
+  "op.verifiedChain": "Proof verified on-chain",
+  "op.revoking": "Revoking…",
+  "op.revoked": "Certificate revoked",
+  "op.reactivating": "Reactivating…",
+  "op.reactivated": "Certificate reactivated",
+  "op.proofDone": "Proof generated & self-verified",
+  "op.commitmentCopied": "Commitment copied",
+  "op.copied": "Copied to clipboard",
+  "op.clipboard": "Clipboard unavailable",
+
+  // validations & errors
+  "valid.addr": "Enter a valid Ethereum address",
+  "valid.holderReq": "Holder address is required",
+  "valid.issuerReq": "Issuer address is required",
+  "valid.verifierReq": "Verifier address is required",
+  "valid.nameReq": "Name is required",
+  "valid.gpaReq": "GPA is required",
+  "valid.range": "Must be between {min} and {max}",
+  "valid.imgReq": "Certificate image is required",
+  "valid.fieldReq": "{label} is required",
+  "issue.expiryHint": "expiry date",
+  "issue.claimsHintFull": "— committed on-chain, provable by threshold, never revealed",
+  "err.selectCred": "Select a credential to share",
+  "err.selectField": "Select at least one field to disclose",
+  "err.loadCert": "Load a certificate first",
+  "err.noSalts": "This credential has no ZK salts (issued before the ZK upgrade).",
+  "err.enterThreshold": "Enter a threshold",
+  "err.enterValue": "Enter a value to match",
+  "err.enterSet": "Enter allowed values (comma-separated)",
+  "err.notFound": "Certificate not found",
+  "err.metaFail": "Failed to load metadata from IPFS",
+  "err.proofFail": "Failed to generate proof",
+
+  // hints
+  "hint.gpa": "0–5 scale",
+  "hint.imgTypes": "PNG or JPEG, stored on IPFS",
+  "hint.claims": "— committed on-chain, provable by threshold, never revealed",
+  "hint.eq": "Revealed to the verifier; other claims stay hidden",
+  "hint.set": "Comma-separated (max 8) — which one matched stays hidden",
+  "hint.threshold": "Proves {label} ≥ threshold (range {min}–{max})",
+  "hint.hidden": "Value stays hidden",
+  "expiry.note": "Proves {label} ≥ now — the credential is not expired.",
+
+  // verifier extras
+  "proof.min": "Minimum {label}",
+  "proof.eqLabel": "{label} equals",
+  "proof.setLabel": "{label} is one of",
+  "proof.connectNote": "Connect a wallet to submit the on-chain verification.",
+  "proof.selfPassed": "self-verify passed",
+  "proof.selfFailed": "self-verify failed",
+
+  // card / loaders
+  "card.metaError": "Metadata could not be loaded from IPFS.",
+  "card.verified": "Verified",
+  "card.issued": "Issued {date}",
+  "load.members": "Loading members…",
+  "load.fields": "Loading credential fields…",
+  "load.proof": "Computing zero-knowledge proof…",
+  "load.memberships": "Checking memberships…",
 };
 
 const id: Dict = {
@@ -231,6 +319,103 @@ const id: Dict = {
   "status.Revoked": "Dicabut",
   "revoke": "Cabut",
   "reactivate": "Aktifkan lagi",
+
+  "tx.submitting": "Mengirim transaksi…",
+  "tx.confirming": "Menunggu konfirmasi…",
+  "tx.confirmed": "Transaksi terkonfirmasi",
+  "tx.failed": "Transaksi gagal",
+
+  "op.registering": "Mendaftarkan penerbit…",
+  "op.registered": "Penerbit terdaftar",
+  "op.removing": "Menghapus penerbit…",
+  "op.removed": "Penerbit dihapus",
+  "op.approving": "Menyetujui anggota…",
+  "op.rejecting": "Menolak anggota…",
+  "op.memberApproved": "Anggota disetujui",
+  "op.memberRejected": "Anggota ditolak",
+  "op.issuing": "Menerbitkan sertifikat…",
+  "op.issued": "Sertifikat diterbitkan",
+  "op.uploadingImg": "Mengunggah gambar ke IPFS…",
+  "op.imgUploaded": "Gambar terunggah",
+  "op.imgFailed": "Unggah gambar gagal",
+  "op.requesting": "Meminta membership…",
+  "op.requested": "Permohonan terkirim",
+  "op.uploadingDisc": "Mengunggah disclosure ke IPFS…",
+  "op.uploaded": "Terunggah",
+  "op.uploadFailed": "Unggah gagal",
+  "op.sharing": "Membagikan kredensial…",
+  "op.shared": "Kredensial dibagikan",
+  "op.verifyingChain": "Memverifikasi bukti on-chain…",
+  "op.verifiedChain": "Bukti terverifikasi on-chain",
+  "op.revoking": "Mencabut…",
+  "op.revoked": "Sertifikat dicabut",
+  "op.reactivating": "Mengaktifkan…",
+  "op.reactivated": "Sertifikat diaktifkan",
+  "op.proofDone": "Bukti dibuat & terverifikasi lokal",
+  "op.commitmentCopied": "Commitment disalin",
+  "op.copied": "Disalin ke clipboard",
+  "op.clipboard": "Clipboard tidak tersedia",
+
+  "valid.addr": "Masukkan alamat Ethereum yang valid",
+  "valid.holderReq": "Alamat holder wajib diisi",
+  "valid.issuerReq": "Alamat penerbit wajib diisi",
+  "valid.verifierReq": "Alamat verifier wajib diisi",
+  "valid.nameReq": "Nama wajib diisi",
+  "valid.gpaReq": "GPA wajib diisi",
+  "valid.range": "Harus antara {min} dan {max}",
+  "valid.imgReq": "Gambar sertifikat wajib",
+  "valid.fieldReq": "{label} wajib diisi",
+  "issue.expiryHint": "tanggal kedaluwarsa",
+  "issue.claimsHintFull": "— di-commit on-chain, bisa dibuktikan lewat ambang, tak pernah diungkap",
+  "err.selectCred": "Pilih kredensial untuk dibagikan",
+  "err.selectField": "Pilih minimal satu field untuk diungkap",
+  "err.loadCert": "Muat sertifikat dulu",
+  "err.noSalts": "Kredensial ini tak punya ZK salt (diterbitkan sebelum upgrade ZK).",
+  "err.enterThreshold": "Masukkan ambang",
+  "err.enterValue": "Masukkan nilai yang dicocokkan",
+  "err.enterSet": "Masukkan nilai yang diizinkan (pisahkan koma)",
+  "err.notFound": "Sertifikat tidak ditemukan",
+  "err.metaFail": "Gagal memuat metadata dari IPFS",
+  "err.proofFail": "Gagal membuat bukti",
+
+  "hint.gpa": "skala 0–5",
+  "hint.imgTypes": "PNG atau JPEG, disimpan di IPFS",
+  "hint.claims": "— di-commit on-chain, bisa dibuktikan lewat ambang, tak pernah diungkap",
+  "hint.eq": "Diungkap ke verifier; klaim lain tetap tersembunyi",
+  "hint.set": "Pisahkan koma (maks 8) — yang cocok tetap tersembunyi",
+  "hint.threshold": "Membuktikan {label} ≥ ambang (rentang {min}–{max})",
+  "hint.hidden": "Nilai tetap tersembunyi",
+  "expiry.note": "Membuktikan {label} ≥ sekarang — kredensial belum kedaluwarsa.",
+
+  "proof.min": "Minimal {label}",
+  "proof.eqLabel": "{label} sama dengan",
+  "proof.setLabel": "{label} salah satu dari",
+  "proof.connectNote": "Hubungkan wallet untuk mengirim verifikasi on-chain.",
+  "proof.selfPassed": "verifikasi lokal lolos",
+  "proof.selfFailed": "verifikasi lokal gagal",
+
+  "card.metaError": "Metadata gagal dimuat dari IPFS.",
+  "card.verified": "Terverifikasi",
+  "card.issued": "Terbit {date}",
+  "load.members": "Memuat anggota…",
+  "load.fields": "Memuat field kredensial…",
+  "load.proof": "Menghitung bukti zero-knowledge…",
+  "load.memberships": "Memeriksa keanggotaan…",
+
+  // schema-driven labels (ID only; EN falls back to the schema's English label via `tt`)
+  "field.name": "Nama penerima",
+  "field.institution": "Institusi",
+  "field.program": "Program",
+  "field.description": "Deskripsi",
+  "field.gpa": "GPA",
+  "field.score": "Skor penilaian",
+  "field.level": "Level",
+  "field.skill": "Keahlian",
+  "field.authority": "Otoritas penerbit",
+  "field.validUntil": "Berlaku sampai",
+  "schema.diploma": "Ijazah Akademik",
+  "schema.competency": "Sertifikat Kompetensi",
+  "schema.license": "Lisensi Profesi",
 };
 
 const dicts: Record<Lang, Dict> = { en, id };
@@ -239,12 +424,15 @@ interface LocaleValue {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  /** Translate with an explicit fallback (for schema-driven labels). */
+  tt: (key: string, fallback: string) => string;
 }
 
 const LocaleContext = createContext<LocaleValue>({
   lang: "en",
   setLang: () => {},
   t: (k) => k,
+  tt: (_k, fb) => fb,
 });
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
@@ -268,7 +456,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     return s;
   };
 
-  return <LocaleContext.Provider value={{ lang, setLang, t }}>{children}</LocaleContext.Provider>;
+  const tt = (key: string, fallback: string) => dicts[lang][key] ?? fallback;
+
+  return (
+    <LocaleContext.Provider value={{ lang, setLang, t, tt }}>{children}</LocaleContext.Provider>
+  );
 }
 
 export const useT = () => useContext(LocaleContext);

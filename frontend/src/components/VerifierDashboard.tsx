@@ -37,16 +37,10 @@ function toStatus(n: number): CertificateStatus {
   return n === 0 ? "Pending" : n === 1 ? "Active" : "Revoked";
 }
 
-const PREDICATE_LABEL: Record<Predicate, string> = {
-  range: "Threshold ≥",
-  equality: "Equals",
-  membership: "One of",
-};
-
 export const VerifierDashboard = () => {
   const { isConnected } = useAccount();
   const { write } = useRegistryWrite();
-  const { t } = useT();
+  const { t, tt } = useT();
 
   const [certificateId, setCertificateId] = useState("");
   const [cert, setCert] = useState<Cert | null>(null);
@@ -104,7 +98,7 @@ export const VerifierDashboard = () => {
         args: [BigInt(certificateId)],
       })) as readonly [bigint, string, string, string, `0x${string}`, number, bigint, `0x${string}`];
       if (data[1] === "0x0000000000000000000000000000000000000000") {
-        throw new Error("Certificate not found");
+        throw new Error(t("err.notFound"));
       }
       const found: Cert = {
         id: data[0],
@@ -127,20 +121,20 @@ export const VerifierDashboard = () => {
         try {
           setMetadata(await fetchFromIpfs<CredentialMetadata>(found.metadataCid));
         } catch {
-          toast.error("Failed to load metadata from IPFS");
+          toast.error(t("err.metaFail"));
         }
       }
     } catch (err: any) {
-      toast.error(err?.message ?? "Certificate not found");
+      toast.error(err?.message ?? t("err.notFound"));
     } finally {
       setIsSearching(false);
     }
   };
 
   const onGenerateProof = async () => {
-    if (!metadata || !schema || !claimField) return toast.error("Load a certificate first");
+    if (!metadata || !schema || !claimField) return toast.error(t("err.loadCert"));
     if (!metadata.salts) {
-      return toast.error("This credential has no ZK salts (issued before the ZK upgrade).");
+      return toast.error(t("err.noSalts"));
     }
     setZkLoading(true);
     setLocalVerified(null);
@@ -152,22 +146,22 @@ export const VerifierDashboard = () => {
           .map((s) => s.trim())
           .filter(Boolean)
           .map((v) => (claimField.kind === "number" ? parseFloat(v) : v));
-        if (list.length === 0) throw new Error("Enter allowed values (comma-separated)");
+        if (list.length === 0) throw new Error(t("err.enterSet"));
         proof = await generateMembershipProof(schema, metadata, claimKey, list);
       } else if (predicate === "equality") {
         const v = claimField.kind === "number" ? parseFloat(eqValue) : eqValue;
-        if (v === "" || (typeof v === "number" && isNaN(v))) throw new Error("Enter a value to match");
+        if (v === "" || (typeof v === "number" && isNaN(v))) throw new Error(t("err.enterValue"));
         proof = await generateEqualityProof(schema, metadata, claimKey, v);
       } else {
-        const t = isExpiry ? Math.floor(Date.now() / 1000) : parseFloat(threshold);
-        if (isNaN(t)) throw new Error("Enter a threshold");
-        proof = await generateRangeProof(schema, metadata, claimKey, t);
+        const thr = isExpiry ? Math.floor(Date.now() / 1000) : parseFloat(threshold);
+        if (isNaN(thr)) throw new Error(t("err.enterThreshold"));
+        proof = await generateRangeProof(schema, metadata, claimKey, thr);
       }
       setZkProof({ proof, predicate });
       setLocalVerified(await verifyProof(proof, predicate));
-      toast.success("Proof generated & self-verified");
+      toast.success(t("op.proofDone"));
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to generate proof");
+      toast.error(err?.message ?? t("err.proofFail"));
     } finally {
       setZkLoading(false);
     }
@@ -185,8 +179,8 @@ export const VerifierDashboard = () => {
           ? "verifyMembershipProof"
           : "verifyRangeProof";
       await write(fn, [cert.id, a, b, c, pubSignals], {
-        pending: "Verifying proof on-chain…",
-        success: "Proof verified on-chain",
+        pending: t("op.verifyingChain"),
+        success: t("op.verifiedChain"),
       });
     } catch {
       /* toast shown by useRegistryWrite */
@@ -241,7 +235,7 @@ export const VerifierDashboard = () => {
                   <>
                     <div className="mb-1">
                       <span className="badge border-primary/25 bg-primary-tint text-primary">
-                        {schema?.label ?? "Unknown type"}
+                        {schema ? tt(`schema.${schema.type}`, schema.label) : "Unknown type"}
                       </span>
                     </div>
                     <h3 className="font-serif text-xl font-semibold text-ink">{metadata.name}</h3>
@@ -291,7 +285,7 @@ export const VerifierDashboard = () => {
                         : "border-line-strong text-ink-muted hover:border-primary/40"
                     )}
                   >
-                    {f.label}
+                    {tt(`field.${f.key}`, f.label)}
                   </button>
                 ))}
               </div>
@@ -333,8 +327,8 @@ export const VerifierDashboard = () => {
               </p>
             ) : predicate === "membership" ? (
               <Field
-                label={`${claimField.label} is one of`}
-                hint="Comma-separated (max 8) — which one matched stays hidden"
+                label={t("proof.setLabel", { label: tt(`field.${claimField.key}`, claimField.label) })}
+                hint={t("hint.set")}
               >
                 <input
                   className="input"
@@ -345,7 +339,7 @@ export const VerifierDashboard = () => {
                 />
               </Field>
             ) : predicate === "equality" ? (
-              <Field label={`${claimField.label} equals`} hint="Revealed to the verifier; other claims stay hidden">
+              <Field label={t("proof.eqLabel", { label: tt(`field.${claimField.key}`, claimField.label) })} hint={t("hint.eq")}>
                 <input
                   className="input"
                   type={claimField.kind === "number" ? "number" : "text"}
@@ -356,11 +350,11 @@ export const VerifierDashboard = () => {
               </Field>
             ) : (
               <Field
-                label={`Minimum ${claimField.label}`}
+                label={t("proof.min", { label: tt(`field.${claimField.key}`, claimField.label) })}
                 hint={
                   claimField.min !== undefined
-                    ? `Proves ${claimField.label} ≥ threshold (range ${claimField.min}–${claimField.max})`
-                    : "Value stays hidden"
+                    ? t("hint.threshold", { label: tt(`field.${claimField.key}`, claimField.label), min: claimField.min ?? "", max: claimField.max ?? "" })
+                    : t("hint.hidden")
                 }
               >
                 <input
@@ -384,7 +378,7 @@ export const VerifierDashboard = () => {
             </button>
           </div>
 
-          {zkLoading && <Spinner label="Computing zero-knowledge proof…" />}
+          {zkLoading && <Spinner label={t("load.proof")} />}
 
           {zkProof && (
             <div className="space-y-4 rounded-lg border border-valid/25 bg-valid-tint p-4">
@@ -393,7 +387,7 @@ export const VerifierDashboard = () => {
                 {t("proof.generated")}
                 {localVerified !== null && (
                   <span className="text-ink-muted">
-                    · self-verify {localVerified ? "passed" : "failed"}
+                    · {localVerified ? t("proof.selfPassed") : t("proof.selfFailed")}
                   </span>
                 )}
               </div>
@@ -407,7 +401,7 @@ export const VerifierDashboard = () => {
               </button>
               {!isConnected && (
                 <p className="text-xs text-pending-ink">
-                  Connect a wallet to submit the on-chain verification.
+                  {t("proof.connectNote")}
                 </p>
               )}
             </div>

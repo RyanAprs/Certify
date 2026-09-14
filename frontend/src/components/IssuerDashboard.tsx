@@ -73,7 +73,7 @@ export const IssuerDashboard = () => {
   } = useMemberRequests(address);
   const { write } = useRegistryWrite();
   const { isAdmin, refreshRole } = useRole();
-  const { t } = useT();
+  const { t, tt } = useT();
   const { data: issuers, refetch: refetchIssuers } = useRegisteredIssuers();
 
   const [schema, setSchema] = useState<Schema>(SCHEMAS[0]);
@@ -90,8 +90,8 @@ export const IssuerDashboard = () => {
     setRemovingIssuer(addr);
     try {
       await write("removeIssuer", [addr as `0x${string}`], {
-        pending: "Removing issuer…",
-        success: "Issuer removed",
+        pending: t("op.removing"),
+        success: t("op.removed"),
       });
       await refetchIssuers();
     } catch {
@@ -102,12 +102,12 @@ export const IssuerDashboard = () => {
   };
 
   const onRegisterIssuer = async () => {
-    if (!isAddress(issuerAddr)) return toast.error("Enter a valid Ethereum address");
+    if (!isAddress(issuerAddr)) return toast.error(t("valid.addr"));
     setRegistering(true);
     try {
       await write("registerIssuer", [issuerAddr as `0x${string}`], {
-        pending: "Registering issuer…",
-        success: "Issuer registered",
+        pending: t("op.registering"),
+        success: t("op.registered"),
       });
       setIssuerAddr("");
       await refetchIssuers();
@@ -122,8 +122,8 @@ export const IssuerDashboard = () => {
     setProcessing(holder);
     try {
       await write("manageMember", [holder, approve], {
-        pending: approve ? "Approving member…" : "Rejecting member…",
-        success: approve ? "Member approved" : "Member rejected",
+        pending: approve ? t("op.approving") : t("op.rejecting"),
+        success: approve ? t("op.memberApproved") : t("op.memberRejected"),
       });
       await refetchMembers();
     } catch {
@@ -137,7 +137,7 @@ export const IssuerDashboard = () => {
     setIsIssuing(true);
     try {
       const file = values.image?.item(0);
-      if (!file) throw new Error("Certificate image is required");
+      if (!file) throw new Error(t("valid.imgReq"));
 
       const rawClaims: Record<string, number | string> = {};
       for (const f of schema.claims) {
@@ -152,9 +152,9 @@ export const IssuerDashboard = () => {
       const { rootHex, salts } = buildCommitment(schema, rawClaims);
 
       const imageCid = await toast.promise(uploadFile(file), {
-        loading: "Uploading image to IPFS…",
-        success: "Image uploaded",
-        error: "Image upload failed",
+        loading: t("op.uploadingImg"),
+        success: t("op.imgUploaded"),
+        error: t("op.imgFailed"),
       });
 
       const metadata: CredentialMetadata = {
@@ -174,7 +174,7 @@ export const IssuerDashboard = () => {
       await write(
         "issueCertificate",
         [values.holder as `0x${string}`, metadataCid, rootHex, schema.id],
-        { pending: "Issuing certificate…", success: "Certificate issued" }
+        { pending: t("op.issuing"), success: t("op.issued") }
       );
       form.reset({ holder: "", display: {}, claims: {} });
     } catch (err: any) {
@@ -273,7 +273,7 @@ export const IssuerDashboard = () => {
                       : "border-line-strong bg-surface text-ink-muted hover:border-primary/40"
                   )}
                 >
-                  <span className="block font-semibold">{s.label}</span>
+                  <span className="block font-semibold">{tt(`schema.${s.type}`, s.label)}</span>
                   <span className="block text-xs text-ink-subtle">{s.type}.{s.version}</span>
                 </button>
               ))}
@@ -286,8 +286,8 @@ export const IssuerDashboard = () => {
               placeholder="0x…"
               disabled={isIssuing}
               {...form.register("holder", {
-                required: "Holder address is required",
-                validate: (v) => isAddress(v) || "Enter a valid Ethereum address",
+                required: t("valid.holderReq"),
+                validate: (v) => isAddress(v) || t("valid.addr"),
               })}
             />
           </Field>
@@ -295,7 +295,7 @@ export const IssuerDashboard = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             {schema.display.map((f) => (
               <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                <Field label={f.label}>
+                <Field label={tt(`field.${f.key}`, f.label)}>
                   {f.type === "textarea" ? (
                     <textarea
                       className="input min-h-[80px] resize-y"
@@ -321,7 +321,7 @@ export const IssuerDashboard = () => {
             <p className="mb-3 text-sm font-medium text-ink">
               {t("issue.claimsTitle")}{" "}
               <span className="font-normal text-ink-subtle">
-                — committed on-chain, provable by threshold, never revealed
+                {t("hint.claims")}
               </span>
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -332,12 +332,12 @@ export const IssuerDashboard = () => {
                   f.kind === "number" && f.min !== undefined
                     ? `${f.min}–${f.max}${f.unit ? ` ${f.unit}` : ""}`
                     : f.kind === "timestamp"
-                    ? "expiry date"
+                    ? t("issue.expiryHint")
                     : undefined;
                 return (
                   <Field
                     key={f.key}
-                    label={f.label}
+                    label={tt(`field.${f.key}`, f.label)}
                     hint={hint}
                     error={(errors.claims as any)?.[f.key]?.message}
                   >
@@ -349,7 +349,7 @@ export const IssuerDashboard = () => {
                         : {})}
                       disabled={isIssuing}
                       {...form.register(`claims.${f.key}` as const, {
-                        required: `${f.label} is required`,
+                        required: t("valid.fieldReq", { label: tt(`field.${f.key}`, f.label) }),
                         validate: (v) => {
                           if (f.kind !== "number") return true;
                           const n = parseFloat(v);
@@ -357,7 +357,7 @@ export const IssuerDashboard = () => {
                             (!isNaN(n) &&
                               n >= (f.min ?? -Infinity) &&
                               n <= (f.max ?? Infinity)) ||
-                            `Must be between ${f.min} and ${f.max}`
+                            t("valid.range", { min: f.min ?? "", max: f.max ?? "" })
                           );
                         },
                       })}
@@ -368,7 +368,7 @@ export const IssuerDashboard = () => {
             </div>
           </div>
 
-          <Field label={t("issue.image")} hint="PNG or JPEG, stored on IPFS">
+          <Field label={t("issue.image")} hint={t("hint.imgTypes")}>
             <input
               className="input file:mr-3 file:rounded file:border-0 file:bg-sunken file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
               type="file"
@@ -380,7 +380,7 @@ export const IssuerDashboard = () => {
 
           <button className="btn-primary w-full" disabled={isIssuing}>
             <Stamp size={16} aria-hidden="true" />
-            {isIssuing ? t("issue.submitting") : t("issue.submit", { type: schema.label.toLowerCase() })}
+            {isIssuing ? t("issue.submitting") : t("issue.submit", { type: tt(`schema.${schema.type}`, schema.label).toLowerCase() })}
           </button>
         </form>
 

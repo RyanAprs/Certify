@@ -265,7 +265,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
   const { address } = useAccount();
   const { isAdmin } = useRole();
   const { write } = useRegistryWrite();
-  const { t } = useT();
+  const { t, tt } = useT();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const canManage =
@@ -349,7 +349,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : state === "error" ? (
-            <p className="text-sm text-pending-ink">Metadata could not be loaded from IPFS.</p>
+            <p className="text-sm text-pending-ink">{t("card.metaError")}</p>
           ) : (
             metadata && (
               <>
@@ -369,7 +369,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
                           key={f.key}
                           className="inline-flex items-baseline gap-1.5 rounded-md bg-sunken px-2.5 py-1"
                         >
-                          <span className="text-xs text-ink-subtle">{f.label}</span>
+                          <span className="text-xs text-ink-subtle">{tt(`field.${f.key}`, f.label)}</span>
                           <span className="font-mono text-sm font-semibold text-ink">
                             {f.kind === "timestamp"
                               ? format(Number(metadata.claims[f.key]) * 1000, "d MMM yyyy")
@@ -396,7 +396,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
           </dl>
 
           <p className="pt-1 text-xs text-ink-subtle">
-            Issued {issued ? format(issued, "d MMM yyyy") : metadata?.issuedAt ?? "—"}
+            {t("card.issued", { date: issued ? format(issued, "d MMM yyyy") : metadata?.issuedAt ?? "—" })}
           </p>
         </div>
 
@@ -418,7 +418,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
             >
               <BadgeCheck size={26} strokeWidth={1.75} />
               <span className="mt-1 font-mono text-[0.6rem] uppercase tracking-wider">
-                {verified ? "Verified" : certificate.status}
+                {verified ? t("card.verified") : t(`status.${certificate.status}`)}
               </span>
             </div>
           )}
@@ -431,7 +431,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
         onClick={() => {
           navigator.clipboard?.writeText(certificate.metadataCommitment);
           setCopied(true);
-          toast.success("Commitment copied");
+          toast.success(t("op.commitmentCopied"));
           setTimeout(() => setCopied(false), 1500);
         }}
         className="flex w-full items-center justify-between border-t border-line px-5 py-2.5 text-left font-mono text-[0.7rem] text-ink-subtle transition hover:bg-sunken/60"
