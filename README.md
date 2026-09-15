@@ -178,7 +178,7 @@ NODE_ENV=development
 
 ## Frontend (React + Vite)
 
-React 18 + Vite + Wagmi + RainbowKit untuk user interface.
+React 18 + Vite + Wagmi + RainbowKit for the user interface.
 
 **Setup:**
 ```bash
@@ -188,7 +188,7 @@ npm install
 npm run dev
 ```
 
-**Environment Variables** (alamat kontrak datang dari `deployment.json`, jadi ini opsional):
+**Environment Variables** (the contract address comes from `deployment.json`, so this is optional):
 ```env
 VITE_RPC_URL=http://127.0.0.1:8545
 VITE_CONTRACT_ADDRESS=            # opsional: override deployment.json

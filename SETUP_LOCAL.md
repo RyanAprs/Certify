@@ -239,17 +239,17 @@ Expected output:
 
 4. Click **Save**
 
-### 6.2 Import Account dari Hardhat
+### 6.2 Import an Account from Hardhat
 
-1. Click account icon → **Import Account**
-2. Pilih **Private Key**
-3. Copy private key dari hardhat node output (Account #0):
+1. Click the account icon → **Import Account**
+2. Select **Private Key**
+3. Copy the private key from the hardhat node output (Account #0):
    ```
    0xac0974bec39a17e36ba4a6b4d238ff944bacb476cad4d0f5addcf4239bbb3f25
    ```
-4. Paste dan **Import**
+4. Paste and **Import**
 
-✅ MetaMask siap dengan account lokal yang punya ETH
+✅ MetaMask ready with a local account that has ETH
 
 ---
 
