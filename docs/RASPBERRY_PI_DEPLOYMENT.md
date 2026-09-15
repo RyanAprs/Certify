@@ -1,107 +1,107 @@
-# Deployment di Raspberry Pi (Raspbian/Debian)
+# Deployment on Raspberry Pi (Raspbian/Debian)
 
-Panduan lengkap untuk menginstall dan menjalankan Certify di Raspberry Pi dengan OS Raspbian atau Debian.
+Complete guide to installing and running Certify on a Raspberry Pi with the Raspbian or Debian OS.
 
-## Persyaratan Sistem
+## System Requirements
 
-- Raspberry Pi (3B+ atau lebih baru direkomendasikan)
-- **Raspbian** (Raspberry Pi OS) atau **Debian** OS
-- Koneksi internet
-- Minimal 2GB RAM (4GB+ direkomendasikan)
-- Minimal 8GB storage (16GB+ direkomendasikan)
+- Raspberry Pi (3B+ or newer recommended)
+- **Raspbian** (Raspberry Pi OS) or **Debian** OS
+- Internet connection
+- Minimum 2GB RAM (4GB+ recommended)
+- Minimum 8GB storage (16GB+ recommended)
 
-## Kompatibilitas OS
+## OS Compatibility
 
-Script dan setup ini **100% kompatibel** dengan:
+This script and setup are **100% compatible** with:
 
-- ✅ **Raspbian** (Raspberry Pi OS) - Semua versi
-- ✅ **Debian** - Versi 10 (Buster) atau lebih baru
-- ✅ **Ubuntu** - Versi 20.04 atau lebih baru (untuk referensi)
+- ✅ **Raspbian** (Raspberry Pi OS) - All versions
+- ✅ **Debian** - Version 10 (Buster) or newer
+- ✅ **Ubuntu** - Version 20.04 or newer (for reference)
 
-Script akan otomatis mendeteksi OS yang digunakan dan memberikan konfirmasi kompatibilitas.
+The script automatically detects the OS in use and confirms compatibility.
 
-## Opsi Instalasi
+## Installation Options
 
-Ada dua cara untuk menginstall Certify di Raspberry Pi:
+There are two ways to install Certify on a Raspberry Pi:
 
-### Opsi 1: Docker (Direkomendasikan)
+### Option 1: Docker (Recommended)
 
-**Keuntungan:**
+**Advantages:**
 
-- Isolasi dependencies
-- Mudah update dan rollback
-- Tidak mengotori sistem
-- Konsisten di berbagai environment
+- Dependency isolation
+- Easy to update and roll back
+- Does not clutter the system
+- Consistent across different environments
 
-**Kekurangan:**
+**Disadvantages:**
 
-- Membutuhkan lebih banyak RAM
-- Perlu install Docker terlebih dahulu
+- Requires more RAM
+- Docker must be installed first
 
-**Catatan untuk Raspbian:**
+**Note for Raspbian:**
 
-- Docker secara otomatis mendeteksi architecture ARM (armv7/arm64) dan menggunakan image yang sesuai
-- Build time mungkin lebih lama di Raspberry Pi karena architecture ARM
-- Pastikan Raspberry Pi memiliki minimal 2GB RAM untuk Docker (4GB+ direkomendasikan)
+- Docker automatically detects the ARM architecture (armv7/arm64) and uses the appropriate image
+- Build time may be longer on a Raspberry Pi due to the ARM architecture
+- Make sure the Raspberry Pi has at least 2GB RAM for Docker (4GB+ recommended)
 
-### Opsi 2: Manual Setup (Tanpa Docker)
+### Option 2: Manual Setup (Without Docker)
 
-**Keuntungan:**
+**Advantages:**
 
-- Lebih ringan di resource
-- Kontrol penuh atas konfigurasi
-- Tidak perlu Docker
+- Lighter on resources
+- Full control over configuration
+- No Docker required
 
-**Kekurangan:**
+**Disadvantages:**
 
-- Lebih kompleks untuk maintenance
-- Dependencies terinstall langsung di sistem
+- More complex to maintain
+- Dependencies are installed directly on the system
 
 ---
 
-## Opsi 1: Instalasi dengan Docker
+## Option 1: Installation with Docker
 
-### Langkah 1: Clone Repository
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/RyanAprs/Certify.git
 cd Certify
 ```
 
-### Langkah 2: Jalankan Setup Script
+### Step 2: Run the Setup Script
 
 ```bash
 chmod +x scripts/setup-docker.sh
 sudo ./scripts/setup-docker.sh
 ```
 
-Script ini akan:
+This script will:
 
-- Install Docker dan Docker Compose (jika belum ada)
-- Membuat file `.env` dengan session secret
-- Build dan start container untuk backend dan frontend
+- Install Docker and Docker Compose (if not already present)
+- Create a `.env` file with a session secret
+- Build and start the containers for the backend and frontend
 
-### Langkah 3: Konfigurasi Environment Variables
+### Step 3: Configure Environment Variables
 
-Edit file `.env` di root project:
+Edit the `.env` file in the project root:
 
 ```bash
 nano .env
 ```
 
-Tambahkan konfigurasi yang diperlukan (lihat `backend/.env.example` dan `frontend/.env.example`).
+Add the required configuration (see `backend/.env.example` and `frontend/.env.example`).
 
-### Langkah 4: Rebuild Container (jika perlu)
+### Step 4: Rebuild the Container (if needed)
 
 ```bash
 docker compose down
 docker compose up -d --build
 ```
 
-### Manajemen Container
+### Container Management
 
 ```bash
-# Lihat logs
+# View logs
 docker compose logs -f
 
 # Stop services
@@ -110,43 +110,43 @@ docker compose down
 # Restart services
 docker compose restart
 
-# Lihat status
+# View status
 docker compose ps
 
-# Update code dan rebuild
+# Update code and rebuild
 git pull
 docker compose up -d --build
 ```
 
 ---
 
-## Opsi 2: Instalasi Manual (Tanpa Docker)
+## Option 2: Manual Installation (Without Docker)
 
-### Langkah 1: Clone Repository
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/RyanAprs/Certify.git
 cd Certify
 ```
 
-### Langkah 2: Jalankan Setup Script
+### Step 2: Run the Setup Script
 
 ```bash
 chmod +x scripts/setup-raspberry-pi.sh
 sudo ./scripts/setup-raspberry-pi.sh
 ```
 
-Script ini akan:
+This script will:
 
-- Update sistem packages
+- Update system packages
 - Install Node.js 20.x
-- Install build essentials (gcc, make, dll)
-- Install PM2 untuk process management
-- Install dan setup nginx
-- Build backend dan frontend
-- Setup PM2 ecosystem file
+- Install build essentials (gcc, make, etc.)
+- Install PM2 for process management
+- Install and set up nginx
+- Build the backend and frontend
+- Set up the PM2 ecosystem file
 
-### Langkah 3: Deployment Contracts
+### Step 3: Deploy Contracts
 
 ```
 cd contracts
@@ -156,7 +156,7 @@ npx hardhat compile
 npx hardhat run scripts/deploy.ts --network localhost
 ```
 
-### Langkah 4: Konfigurasi Environment Variables
+### Step 4: Configure Environment Variables
 
 **Backend:**
 
@@ -166,7 +166,7 @@ cp .env.example .env
 nano .env
 ```
 
-Isi dengan konfigurasi yang sesuai:
+Fill in the appropriate configuration:
 
 ```env
 PORT=4000
@@ -183,7 +183,7 @@ cp .env.example .env
 nano .env
 ```
 
-Isi dengan konfigurasi yang sesuai:
+Fill in the appropriate configuration:
 
 ```env
 VITE_RPC_URL=http://127.0.0.1:8545
@@ -196,7 +196,7 @@ VITE_PINATA_JWT="YOUR_PINATA_JWT"
 VITE_GATEWAY_URL="your-gateway.mypinata.cloud"
 ```
 
-### Langkah 5: Run
+### Step 5: Run
 
 **Contracts:**
 
@@ -205,7 +205,7 @@ cd contracts
 npx hardhat node
 ```
 
-Copy private key untuk login
+Copy a private key to log in
 
 **Backend:**
 
@@ -221,4 +221,4 @@ cd frontend
 npm run dev
 ```
 
-buka di browser `http://localhost:5173/`
+Open in a browser: `http://localhost:5173/`

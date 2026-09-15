@@ -1,6 +1,6 @@
 # Certify - Technical Architecture
 
-Dokumentasi teknis lengkap untuk memahami design, flow, dan decision dari Certify system.
+Complete technical documentation to understand the design, flow, and decisions of the Certify system.
 
 ---
 
@@ -21,7 +21,7 @@ Dokumentasi teknis lengkap untuk memahami design, flow, dan decision dari Certif
 
 ## System Overview
 
-Certify adalah sistem terdesentralisasi untuk verifikasi sertifikat akademik dengan privacy melalui zero-knowledge proofs.
+Certify is a decentralized system for verifying academic certificates with privacy through zero-knowledge proofs.
 
 ### High-Level Architecture
 

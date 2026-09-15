@@ -2,41 +2,41 @@
 
 **Decentralized Certificate Verification System with Zero-Knowledge Proofs**
 
-Sistem verifikasi sertifikat akademik berbasis blockchain yang menggabungkan:
-- **Solidity + Hardhat** untuk smart contracts
-- **React + Vite + Wagmi** untuk frontend
-- **IPFS (Pinata)** untuk distributed storage
-- **Circom + snarkjs** untuk zero-knowledge proofs
-- **Express.js** untuk SIWE authentication
+A blockchain-based academic certificate verification system that combines:
+- **Solidity + Hardhat** for smart contracts
+- **React + Vite + Wagmi** for the frontend
+- **IPFS (Pinata)** for distributed storage
+- **Circom + snarkjs** for zero-knowledge proofs
+- **Express.js** for SIWE authentication
 
-Certify memungkinkan issuers menerbitkan sertifikat, holders menyimpan & membagikan dengan selective disclosure menggunakan ZKP, dan verifiers memverifikasi tanpa melihat data sensitif.
+Certify enables issuers to issue certificates, holders to store & share them with selective disclosure using ZKP, and verifiers to verify without seeing sensitive data.
 
 ## 🚀 Quick Start
 
-**Untuk setup lokal dengan instruksi lengkap, lihat [SETUP_LOCAL.md](./SETUP_LOCAL.md)**
+**For local setup with complete instructions, see [SETUP_LOCAL.md](./SETUP_LOCAL.md)**
 
-**Satu perintah menjalankan seluruh stack** (install → node → deploy → backend → frontend, Ctrl+C mematikan semua):
+**A single command runs the entire stack** (install → node → deploy → backend → frontend, Ctrl+C shuts everything down):
 
 ```bash
 git clone <repository> && cd Certify
-npm run dev            # buka http://localhost:5173
+npm run dev            # open http://localhost:5173
 ```
 
-Lalu di MetaMask: tambah network RPC `http://127.0.0.1:8545`, Chain ID `31337`, dan import Account #0 dari output `[chain]` (admin/issuer default).
+Then in MetaMask: add the RPC network `http://127.0.0.1:8545`, Chain ID `31337`, and import Account #0 from the `[chain]` output (the default admin/issuer).
 
-**(Opsional) aktifkan verifikasi ZK on-chain** — hanya butuh `circom` v2 (powers-of-tau di-generate otomatis oleh build):
+**(Optional) enable on-chain ZK verification** — only requires `circom` v2 (powers-of-tau is generated automatically by the build):
 
 ```bash
 npm run zk:build            # build 3 circuits → range/equality/membership + verifiers
-FORCE_DEPLOY=1 npm run dev  # deploy ulang pakai verifier asli
+FORCE_DEPLOY=1 npm run dev  # redeploy using the real verifiers
 ```
 
-> Tanpa `zk:build`, semua alur jalan; hanya tombol **"Verify on-chain"** yang nonaktif
-> (verifier placeholder menolak semua proof, dan UI menampilkan peringatan).
+> Without `zk:build`, all flows work; only the **"Verify on-chain"** button is disabled
+> (the placeholder verifiers reject all proofs, and the UI shows a warning).
 
 ---
 
-## Monorepo Struktur
+## Monorepo Structure
 
 ```
 Certify
@@ -44,46 +44,46 @@ Certify
 ├─ frontend/         # React + Vite + Wagmi UI
 ├─ backend/          # Express.js SIWE auth server
 ├─ zk/               # Circom circuits + snarkjs
-├─ README.md         # File ini
-├─ SETUP_LOCAL.md    # 📖 Panduan setup lokal (baca ini dulu!)
-└─ ARCHITECTURE.md   # 📖 Dokumentasi teknis
+├─ README.md         # This file
+├─ SETUP_LOCAL.md    # 📖 Local setup guide (read this first!)
+└─ ARCHITECTURE.md   # 📖 Technical documentation
 ```
 
-## ✨ Fitur Utama
+## ✨ Key Features
 
-**Multi-jenis kredensial** (schema-driven). Bawaan: `diploma.v1` (GPA),
+**Multi-type credentials** (schema-driven). Built-in: `diploma.v1` (GPA),
 `competency.v1` (score/level/skill), `license.v1` (authority/level/validUntil).
-Menambah jenis baru cukup menambah schema di `frontend/src/lib/schemas.ts`.
+Adding a new type only requires adding a schema in `frontend/src/lib/schemas.ts`.
 
-**3 predikat selective-disclosure** (tiap klaim bisa memilih mana yang boleh dibuktikan):
-- **range** — `nilai ≥ threshold` (juga expiry: `validUntil ≥ now`)
-- **equality** — `nilai == X` (mendukung string, mis. "authority == BNSP")
-- **membership** — `nilai ∈ {A, B, C}` tanpa ungkap yang mana
+**3 selective-disclosure predicates** (each claim can choose which ones may be proven):
+- **range** — `value ≥ threshold` (also expiry: `validUntil ≥ now`)
+- **equality** — `value == X` (supports strings, e.g. "authority == BNSP")
+- **membership** — `value ∈ {A, B, C}` without revealing which one
 
-### Issuer (Penerbit)
-- ✅ **Admin**: register / remove issuer dari web (panel admin)
-- ✅ Approve/reject permohonan membership holder
-- ✅ Pilih jenis kredensial → form dinamis dari schema; issue dengan image IPFS
-- ✅ **Revoke / Reactivate** sertifikat langsung dari kartu
+### Issuer
+- ✅ **Admin**: register / remove issuer from the web (admin panel)
+- ✅ Approve/reject holder membership requests
+- ✅ Select credential type → dynamic form from the schema; issue with an IPFS image
+- ✅ **Revoke / Reactivate** certificates directly from the card
 
-### Holder (Penerima)
-- ✅ Request membership ke issuer
+### Holder
+- ✅ Request membership from an issuer
 - ✅ View credentials
-- ✅ Share dengan verifier (selective disclosure)
+- ✅ Share with a verifier (selective disclosure)
 
-### Verifier (Pemverifikasi)
+### Verifier
 - ✅ Search credential by ID
-- ✅ Presentation request: pilih **klaim + predikat** (threshold / equals / one-of / not-expired)
-- ✅ Verify Groth16 proof on-chain (nilai tetap privat)
+- ✅ Presentation request: select **claim + predicate** (threshold / equals / one-of / not-expired)
+- ✅ Verify Groth16 proof on-chain (values stay private)
 - ✅ See disclosure history
 
 ### Security & Privacy
 - ✅ **Wallet Auth** - Connect via RainbowKit; on-chain roles enforce access
-- ✅ **3 ZK Predicates** - range/equality/membership; semua constraint dienforce di circuit
+- ✅ **3 ZK Predicates** - range/equality/membership; all constraints enforced in the circuit
 - ✅ **Verifier Registry** - `predicateId → verifier`; tiap circuit punya verifier sendiri
 - ✅ **Proof Replay Protection** - Setiap proof single-use (`usedProofs` hash tracking)
-- ✅ **Merkle Commitment** - `metadataCommitment` = Merkle root dari klaim; proof terikat ke root
-- ✅ **Blinding Salt** - Field element acak per klaim
+- ✅ **Merkle Commitment** - `metadataCommitment` = Merkle root of the claims; proof bound to the root
+- ✅ **Blinding Salt** - Random field element per claim
 
 ## 📚 Documentation
 
@@ -91,7 +91,7 @@ Menambah jenis baru cukup menambah schema di `frontend/src/lib/schemas.ts`.
 |----------|---------|
 | **[SETUP_LOCAL.md](./SETUP_LOCAL.md)** | 🔥 **START HERE** - Complete local setup guide |
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** | Technical design & implementation details |
-| **README.md** | Overview (file ini) |
+| **README.md** | Overview (this file) |
 
 ---
 
@@ -99,11 +99,11 @@ Menambah jenis baru cukup menambah schema di `frontend/src/lib/schemas.ts`.
 
 ### Deployment Architecture
 
-Satu registry (bukan dua — `ZKPCertify` lama sudah dihapus):
+A single registry (not two — the old `ZKPCertify` has been removed):
 
 ```
 RangeVerifier / EqualityVerifier / MembershipVerifier
-  └─ verifyProof(a, b, c, uint[3]) → validasi Groth16 per circuit
+  └─ verifyProof(a, b, c, uint[3]) → Groth16 validation per circuit
 
 CertifyRegistry (registry tunggal)
   ├─ Issuer management (AccessControl: DEFAULT_ADMIN_ROLE, ISSUER_ADMIN_ROLE)
@@ -117,12 +117,12 @@ CertifyRegistry (registry tunggal)
 
 ### Contract Addresses
 
-Setelah deploy, script menulis alamat + ABI otomatis ke
-`frontend/src/lib/deployment.json` dan `CertifyRegistry.abi.json` — **tidak perlu
-copy-paste manual**. `deployment.json` memuat `registry` + `rangeVerifier` +
+After deployment, the script automatically writes the addresses + ABI to
+`frontend/src/lib/deployment.json` and `CertifyRegistry.abi.json` — **no manual
+copy-paste needed**. `deployment.json` contains `registry` + `rangeVerifier` +
 `equalityVerifier` + `membershipVerifier` + `deploymentBlock`.
 
-> `VITE_CONTRACT_ADDRESS` hanya diperlukan sebagai override manual.
+> `VITE_CONTRACT_ADDRESS` is only needed as a manual override.
 
 ### Key Contract Functions
 
@@ -151,7 +151,7 @@ copy-paste manual**. `deployment.json` memuat `registry` + `rangeVerifier` +
 
 ## Backend (SIWE Authentication)
 
-Express.js server untuk Sign-In with Ethereum authentication.
+Express.js server for Sign-In with Ethereum authentication.
 
 **Setup:**
 ```bash

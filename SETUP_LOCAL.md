@@ -1,18 +1,18 @@
 # Local Development Setup - Certify
 
-Panduan lengkap untuk menjalankan Certify di mesin lokal Anda dengan blockchain, ZKP, IPFS, dan autentikasi SIWE.
+A complete guide to running Certify on your local machine with blockchain, ZKP, IPFS, and SIWE authentication.
 
 ## Prerequisites
 
-Pastikan Anda sudah punya:
-- **Node.js** v18+ dan npm
+Make sure you already have:
+- **Node.js** v18+ and npm
 - **Git**
-- **MetaMask** atau wallet Ethereum lain (untuk frontend)
+- **MetaMask** or another Ethereum wallet (for the frontend)
 
-Verifikasi instalasi:
+Verify the installation:
 ```bash
-node --version  # v18.0.0 atau lebih tinggi
-npm --version   # 9.0.0 atau lebih tinggi
+node --version  # v18.0.0 or higher
+npm --version   # 9.0.0 or higher
 ```
 
 ## 1. Clone Repository
@@ -24,7 +24,7 @@ cd Certify
 
 ## 2. Setup Backend (SIWE Authentication)
 
-Backend Express menangani Sign-In with Ethereum (SIWE) untuk autentikasi.
+The Express backend handles Sign-In with Ethereum (SIWE) for authentication.
 
 ```bash
 cd backend
@@ -38,7 +38,7 @@ SESSION_SECRET=your-random-32-char-secret-key-here-minimum-32-chars-long
 NODE_ENV=development
 ```
 
-Install dependencies dan run:
+Install dependencies and run:
 ```bash
 npm install
 npm run dev
@@ -55,13 +55,13 @@ curl http://localhost:4000/api/auth/nonce
 # Response: {"nonce":"..."}
 ```
 
-✅ Backend siap di `http://localhost:4000`
+✅ Backend ready at `http://localhost:4000`
 
 ---
 
 ## 3. Setup Smart Contracts & Blockchain
 
-Hardhat akan menjalankan blockchain lokal (simulated Ethereum).
+Hardhat will run a local blockchain (simulated Ethereum).
 
 ### 3.1 Install Dependencies
 
@@ -81,13 +81,13 @@ Expected output:
 Compiled 3 Solidity files successfully
 ```
 
-Ini akan generate:
-- TypeChain type bindings di `typechain-types/`
+This will generate:
+- TypeChain type bindings in `typechain-types/`
 - Contract ABIs
 
 ### 3.3 Start Local Blockchain
 
-**Terminal baru**, jalankan Hardhat node:
+**In a new terminal**, run the Hardhat node:
 
 ```bash
 npx hardhat node
@@ -103,13 +103,13 @@ Account #0: 0x8ba1f109551bd432803012645ac136ddd64dba72
 ...
 ```
 
-**Jangan close terminal ini!** Ini adalah blockchain lokal Anda.
+**Do not close this terminal!** This is your local blockchain.
 
-Simpan private key Account #0 untuk testing.
+Save the Account #0 private key for testing.
 
 ### 3.4 Deploy Smart Contracts
 
-**Terminal baru** (jangan close blockchain terminal):
+**In a new terminal** (do not close the blockchain terminal):
 
 ```bash
 npm run deploy:local     # = hardhat run scripts/deploy.ts --network localhost
@@ -130,7 +130,7 @@ copy-paste needed.
 > ⚠️ If you haven't run `cd zk && ./build.sh`, the deployed verifier is a
 > placeholder that rejects all proofs. Build the circuit, then redeploy.
 
-✅ Blockchain dan smart contracts ready
+✅ Blockchain and smart contracts ready
 
 ---
 
@@ -169,7 +169,7 @@ FORCE_DEPLOY=1 npm run dev     # deploys the 3 verifiers + registers them
 
 ## 5. Setup Frontend
 
-Frontend React + Vite + Wagmi untuk UI dan blockchain interaction.
+React + Vite + Wagmi frontend for the UI and blockchain interaction.
 
 ### 5.1 Install Dependencies
 
@@ -184,7 +184,7 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` dengan nilai dari deployment Anda:
+Edit `.env` with the values from your deployment:
 
 ```env
 # RPC. The contract address comes from deployment.json (written by deploy),
@@ -195,12 +195,12 @@ VITE_CONTRACT_ADDRESS=
 # Backend API (optional SIWE session)
 VITE_API_BASE_URL=http://localhost:4000
 
-# IPFS (Pinata) - optional untuk development
-# Jika tidak ada, upload image akan disabled
+# IPFS (Pinata) - optional for development
+# If absent, image upload will be disabled
 VITE_PINATA_JWT=your-pinata-jwt-token-optional
 VITE_GATEWAY_URL=gateway.pinata.cloud
 
-# WalletConnect (optional, untuk mobile wallets)
+# WalletConnect (optional, for mobile wallets)
 VITE_WALLETCONNECT_ID=your-walletconnect-project-id-optional
 ```
 
@@ -221,17 +221,17 @@ Expected output:
   ➜  press h to show help
 ```
 
-✅ Frontend ready di `http://localhost:5173`
+✅ Frontend ready at `http://localhost:5173`
 
 ---
 
-## 6. Setup MetaMask untuk Local Blockchain
+## 6. Setup MetaMask for the Local Blockchain
 
-### 6.1 Add Custom Network ke MetaMask
+### 6.1 Add a Custom Network to MetaMask
 
-1. Buka MetaMask extension
-2. Click jaringan dropdown → **Add Network**
-3. Isi form:
+1. Open the MetaMask extension
+2. Click the network dropdown → **Add Network**
+3. Fill in the form:
    - **Network name**: `Hardhat Local`
    - **RPC URL**: `http://127.0.0.1:8545`
    - **Chain ID**: `31337`

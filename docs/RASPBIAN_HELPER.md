@@ -1,28 +1,28 @@
-### Out of memory saat build
+### Out of memory during build
 
 ```bash
-# Tambah swap
+# Add swap
 sudo dphys-swapfile swapoff
 sudo nano /etc/dphys-swapfile
-# Ubah CONF_SWAPSIZE=100 menjadi 2048
+# Change CONF_SWAPSIZE=100 to 2048
 sudo dphys-swapfile setup
 sudo dphys-swapfile swapon
 ```
 
-### Permission denied untuk Docker
+### Permission denied for Docker
 
 ```bash
 sudo usermod -aG docker $USER
-# Log out dan log in kembali
+# Log out and log back in
 ```
 
-## Rekomendasi untuk Raspbian
+## Recommendations for Raspbian
 
-1. **Gunakan Raspberry Pi 4** (4GB+ RAM) untuk performa terbaik
-2. **Gunakan SD card kelas 10** atau lebih baik lagi **SSD via USB**
-3. **Enable SSH** untuk remote access
-4. **Setup static IP** untuk akses yang konsisten
+1. **Use a Raspberry Pi 4** (4GB+ RAM) for the best performance
+2. **Use a Class 10 SD card** or, even better, an **SSD via USB**
+3. **Enable SSH** for remote access
+4. **Set up a static IP** for consistent access
 
-## Perbedaan dengan Debian biasa
+## Differences from regular Debian
 
-Tidak ada perbedaan signifikan dalam setup. Semua command dan script bekerja sama.
+There are no significant differences in the setup. All commands and scripts work the same way.
