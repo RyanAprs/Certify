@@ -45,7 +45,7 @@ Several phenomena that have repeatedly drawn attention from the media and the go
   quality of work.
 
 > 📌 *Note: a list of specific news links to support the points above can be found in the
-> [References](#referensi) section at the end of this document — please complete it with
+> [References](#references) section at the end of this document — please complete it with
 > relevant, up-to-date sources.*
 
 ---

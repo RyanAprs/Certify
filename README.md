@@ -191,37 +191,37 @@ npm run dev
 **Environment Variables** (the contract address comes from `deployment.json`, so this is optional):
 ```env
 VITE_RPC_URL=http://127.0.0.1:8545
-VITE_CONTRACT_ADDRESS=            # opsional: override deployment.json
+VITE_CONTRACT_ADDRESS=            # optional: override deployment.json
 VITE_API_BASE_URL=http://localhost:4000
 VITE_PINATA_JWT=your-token-optional
 VITE_GATEWAY_URL=gateway.pinata.cloud
-VITE_WALLETCONNECT_ID=            # opsional (mobile wallets)
+VITE_WALLETCONNECT_ID=            # optional (mobile wallets)
 ```
 
 **Routes (gated by `RoleGuard` + wallet connection):**
 - `/` - Landing page (connect wallet)
-- `/issuer` - Issuer dashboard (butuh on-chain issuer role)
-- `/holder` - Holder dashboard (butuh wallet terhubung)
-- `/verifier` - Verifier dashboard (butuh wallet terhubung)
+- `/issuer` - Issuer dashboard (requires on-chain issuer role)
+- `/holder` - Holder dashboard (requires a connected wallet)
+- `/verifier` - Verifier dashboard (requires a connected wallet)
 
 ### ZKP Proof Generation Flow
 
 ```
-1. Verifier cari credential → fetch dari blockchain (termasuk schemaId)
-2. Metadata dari IPFS (via metadataCid) — berisi claims + salts
-3. Pilih klaim + PREDIKAT (threshold / equals / one-of / not-expired) → bangun input:
+1. Verifier searches for a credential → fetch from blockchain (including schemaId)
+2. Metadata from IPFS (via metadataCid) — contains claims + salts
+3. Select claim + PREDICATE (threshold / equals / one-of / not-expired) → build inputs:
    - value, salt, Merkle path                        (private)
    - keyHash, param (threshold | value | setRoot)    (public)
-4. Generate proof dengan <predicate>.wasm + .zkey (snarkjs Groth16)
-5. Public signals: [root, keyHash, param]   (root = Merkle root klaim)
-6. Submit ke verify{Range|Equality|Membership}Proof(certId, a, b, c, pubSignals)
-7. Kontrak pilih verifier via registry, cek root == cert.metadataCommitment,
-   cek replay, verifikasi Groth16 → emit ZKVerified(certId, verifier, predicateId, keyHash, param)
+4. Generate proof with <predicate>.wasm + .zkey (snarkjs Groth16)
+5. Public signals: [root, keyHash, param]   (root = Merkle root of the claims)
+6. Submit to verify{Range|Equality|Membership}Proof(certId, a, b, c, pubSignals)
+7. Contract selects the verifier via registry, checks root == cert.metadataCommitment,
+   checks replay, verifies Groth16 → emit ZKVerified(certId, verifier, predicateId, keyHash, param)
 ```
 
 ### IPFS Integration
 
-Metadata & images disimpan di IPFS (Pinata optional):
+Metadata & images are stored on IPFS (Pinata optional):
 
 ```
 Certificate Lifecycle:
@@ -230,7 +230,7 @@ Certificate Lifecycle:
 ├─ Uploads metadata (incl. secret) → IPFS → metadataCid
 ├─ Computes commitment: Merkle root of the claims (Poseidon leaves)
 ├─ Issues certificate on-chain (metadataCid + commitment)
-└─ Holder/Verifier dapat retrieve metadata dari IPFS
+└─ Holder/Verifier can retrieve metadata from IPFS
 
 Selective Disclosure:
 ├─ Holder selects subset of fields → queryHash
@@ -259,21 +259,21 @@ Selective Disclosure:
 - ✅ **Immutable Verifier** - Cannot be swapped after deployment
 - ✅ **Access Control** - OnlyIssuer modifier on sensitive functions  
 - ✅ **Replay Protection** - Nonce + proof hash tracking
-- ✅ **Revocation** - Issuer dapat revoke certificates
-- ✅ **OpenZeppelin** - Audited library untuk AccessControl
+- ✅ **Revocation** - Issuer can revoke certificates
+- ✅ **OpenZeppelin** - Audited library for AccessControl
 
 ### Zero-Knowledge Proofs
 - ✅ **Groth16** - Industry-standard, fast verification
-- ✅ **3 Predicates** - range (`GreaterEqThan`), equality & membership (Merkle inclusion) — semua constraint dienforce di circuit
-- ✅ **Poseidon Commitment** - Hash yang collision-resistant & binding di dalam circuit
-- ✅ **Commitment Binding** - `pubSignals[0]` (Merkle root) harus == `cert.metadataCommitment`
-- ✅ **Replay Protection** - `usedProofs[proofHash]` menolak proof yang sama dua kali
+- ✅ **3 Predicates** - range (`GreaterEqThan`), equality & membership (Merkle inclusion) — all constraints enforced in the circuit
+- ✅ **Poseidon Commitment** - A collision-resistant & binding hash inside the circuit
+- ✅ **Commitment Binding** - `pubSignals[0]` (Merkle root) must == `cert.metadataCommitment`
+- ✅ **Replay Protection** - `usedProofs[proofHash]` rejects the same proof twice
 
 ### Authentication
-- Wallet-based via **RainbowKit** (koneksi wallet = identitas). Aksi write
-  ditandatangani wallet, akses per-role ditentukan state on-chain.
-- Backend **SIWE** (Express) tersedia opsional untuk sesi cookie
-  (nonce TTL, HTTPOnly + SameSite, validasi domain) — tidak wajib untuk alur inti.
+- Wallet-based via **RainbowKit** (wallet connection = identity). Write actions
+  are signed by the wallet, and per-role access is determined by on-chain state.
+- The **SIWE** backend (Express) is available optionally for cookie sessions
+  (nonce TTL, HTTPOnly + SameSite, domain validation) — not required for the core flow.
 
 ### Data Privacy
 - ✅ **Selective Disclosure** - Holder reveals only needed fields
@@ -318,13 +318,13 @@ Selective Disclosure:
 ### Holder/Verifier Proving GPA
 ```
 1. Fetch certificate from blockchain
-2. Fetch metadata from IPFS (berisi gpa + secret)
-3. Pilih klaim + threshold (mis. GPA ≥ 3.5, atau score ≥ 80)
+2. Fetch metadata from IPFS (contains gpa + secret)
+3. Select claim + threshold (e.g. GPA ≥ 3.5, or score ≥ 80)
 4. Generate ZK proof locally:
    - Private: value, salt, Merkle path
    - Public:  keyHash, threshold
 5. Send proof to CertifyRegistry.verifyRangeProof
-6. Contract verifies: value >= threshold (enforced di circuit) + root match
+6. Contract verifies: value >= threshold (enforced in the circuit) + root match
 7. ZKVerified event emitted
 ```
 
@@ -333,7 +333,7 @@ Selective Disclosure:
 1. Get certificate ID from holder
 2. Fetch certificate metadata from IPFS
 3. View proof verification status from blockchain
-4. Confirms holder proved value >= threshold (nilai tetap privat)
+4. Confirms holder proved value >= threshold (values stay private)
 5. No actual GPA value revealed ✅
 ```
 
@@ -388,7 +388,7 @@ npx hardhat run scripts/deploy.ts --network sepolia
 - IPFS optional; certificate works without it
 - To enable, add `VITE_PINATA_JWT` to `.env`
 
-See [SETUP_LOCAL.md](./SETUP_LOCAL.md) Section 8 untuk troubleshooting lengkap.
+See [SETUP_LOCAL.md](./SETUP_LOCAL.md) Section 8 for complete troubleshooting.
 
 ---
 

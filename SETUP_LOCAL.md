@@ -255,34 +255,34 @@ Expected output:
 
 ## 7. Test System End-to-End
 
-Buka browser ke `http://localhost:5173`
+Open your browser to `http://localhost:5173`
 
-### Flow Testing:
+### Testing Flow:
 
-**7.1 Login dengan SIWE**
+**7.1 Log in with SIWE**
 - Click **Connect Wallet** → MetaMask
-- Sign message untuk SIWE auth
-- ✅ Should redirected ke dashboard
+- Sign the message for SIWE auth
+- ✅ Should be redirected to the dashboard
 
 **7.2 Test Issuer Flow**
-- Navigate ke `/issuer`
-- Register issuance institution (one-time)
-- Request approval (simulated - auto-approve untuk testing)
-- Issue sertifikat dengan metadata
+- Navigate to `/issuer`
+- Register the issuance institution (one-time)
+- Request approval (simulated - auto-approve for testing)
+- Issue a certificate with metadata
 - ✅ Certificate appears on-chain
 
 **7.3 Test Holder Flow**
-- Switch to holder account (MetaMask)
-- Navigate ke `/holder`
+- Switch to the holder account (MetaMask)
+- Navigate to `/holder`
 - View issued certificates
-- Generate ZKP proof untuk selective disclosure
-- ✅ Proof generated dan stored on IPFS
+- Generate a ZKP proof for selective disclosure
+- ✅ Proof generated and stored on IPFS
 
 **7.4 Test Verifier Flow**
-- Switch to verifier account
-- Navigate ke `/verifier`
-- Search sertifikat by ID
-- Verify ZKP proof
+- Switch to the verifier account
+- Navigate to `/verifier`
+- Search for a certificate by ID
+- Verify the ZKP proof
 - ✅ Verification result shown
 
 ---
@@ -291,10 +291,10 @@ Buka browser ke `http://localhost:5173`
 
 ### Port Already in Use
 
-Jika port 5173 (frontend), 4000 (backend), atau 8545 (blockchain) sudah terpakai:
+If port 5173 (frontend), 4000 (backend), or 8545 (blockchain) is already in use:
 
 ```bash
-# Kill process pada port
+# Kill the process on the port
 lsof -ti:5173 | xargs kill -9  # Frontend
 lsof -ti:4000 | xargs kill -9  # Backend
 lsof -ti:8545 | xargs kill -9  # Blockchain
@@ -302,19 +302,19 @@ lsof -ti:8545 | xargs kill -9  # Blockchain
 
 ### MetaMask Connection Error
 
-- Ensure Hardhat node running (`npx hardhat node`)
-- Check RPC URL di MetaMask: `http://127.0.0.1:8545`
+- Ensure the Hardhat node is running (`npx hardhat node`)
+- Check the RPC URL in MetaMask: `http://127.0.0.1:8545`
 - Reset account: MetaMask → Account → Advanced → Reset Account
 
 ### ZKP Proof Generation Fails
 
-Check konsol browser (F12) untuk error message:
+Check the browser console (F12) for the error message:
 
 ```
 Failed to fetch range.wasm at /zk/range.wasm
 ```
 
-**Fix**: Verify ZK files di `frontend/public/zk/`
+**Fix**: Verify the ZK files in `frontend/public/zk/`
 
 ```bash
 ls -la frontend/public/zk/
@@ -323,24 +323,24 @@ ls -la frontend/public/zk/
 
 ### "Holder not member" Error
 
-Sertifikat hanya bisa di-issue ke holder yang sudah approve membership request.
+A certificate can only be issued to a holder whose membership request has been approved.
 
 **Fix** (Issuer):
 1. Go to Issuer Dashboard → Member Requests
-2. Find holder → **Approve**
-3. Issue sertifikat
+2. Find the holder → **Approve**
+3. Issue the certificate
 
 ### IPFS Upload Fails (Optional)
 
-IPFS upload optional untuk development. Tanpa IPFS:
-- Gambar sertifikat: not displayed
+IPFS upload is optional for development. Without IPFS:
+- Certificate image: not displayed
 - Metadata: still stored on-chain
 - ZKP: still works
 
-Untuk enable IPFS:
-1. Sign up di [Pinata.cloud](https://pinata.cloud)
-2. Generate API JWT token
-3. Add ke `.env`: `VITE_PINATA_JWT=your-token`
+To enable IPFS:
+1. Sign up at [Pinata.cloud](https://pinata.cloud)
+2. Generate an API JWT token
+3. Add it to `.env`: `VITE_PINATA_JWT=your-token`
 
 ---
 
@@ -405,8 +405,8 @@ Certify/
 │   ├── .env.example
 │   └── package.json
 │
-├── README.md                # Dokumentasi umum
-├── SETUP_LOCAL.md          # File ini - Setup lokal
+├── README.md                # General documentation
+├── SETUP_LOCAL.md          # This file - Local setup
 └── ARCHITECTURE.md         # (Optional) Technical architecture
 ```
 
@@ -414,7 +414,7 @@ Certify/
 
 ## 10. Development Workflow
 
-Selama development, jalankan 3 terminal:
+During development, run 3 terminals:
 
 **Terminal 1: Blockchain**
 ```bash
@@ -434,7 +434,7 @@ cd frontend
 npm run dev
 ```
 
-Buka `http://localhost:5173` di browser.
+Open `http://localhost:5173` in your browser.
 
 ---
 
@@ -443,15 +443,15 @@ Buka `http://localhost:5173` di browser.
 ### Issuer Capabilities
 - ✅ Register institution
 - ✅ Manage member requests (approve/reject)
-- ✅ Issue certificates dengan metadata
-- ✅ Upload certificate image ke IPFS
+- ✅ Issue certificates with metadata
+- ✅ Upload certificate image to IPFS
 - ✅ View issued certificates
 
 ### Holder Capabilities
-- ✅ Request membership ke issuer
+- ✅ Request membership from an issuer
 - ✅ View certificates issued to them
-- ✅ Generate ZKP proof untuk selective disclosure
-- ✅ Share certificate dengan encrypted payload
+- ✅ Generate a ZKP proof for selective disclosure
+- ✅ Share a certificate with an encrypted payload
 - ✅ View proof verification status
 
 ### Verifier Capabilities
@@ -478,10 +478,10 @@ Buka `http://localhost:5173` di browser.
 ## 12. Next Steps
 
 ### For Production:
-- [ ] Deploy ke testnet (Sepolia)
-- [ ] Setup Redis untuk session store (backend)
-- [ ] Enable HTTPS untuk production
-- [ ] Rate limiting di backend
+- [ ] Deploy to a testnet (Sepolia)
+- [ ] Set up Redis for the session store (backend)
+- [ ] Enable HTTPS for production
+- [ ] Rate limiting in the backend
 - [ ] Enhanced error handling
 
 ### For Features:
@@ -492,7 +492,7 @@ Buka `http://localhost:5173` di browser.
 - [ ] Audit logging
 
 ### For Security:
-- [ ] Security audit dari third-party
+- [ ] Third-party security audit
 - [ ] Penetration testing
 - [ ] Bug bounty program
 
@@ -510,18 +510,18 @@ Buka `http://localhost:5173` di browser.
 
 ## Quick Checklist
 
-Sebelum mulai development:
+Before you start development:
 
 - [ ] Node.js v18+ installed
-- [ ] Clone repository
+- [ ] Clone the repository
 - [ ] Backend `.env` configured
-- [ ] Backend running (`npm run dev` di port 4000)
-- [ ] Blockchain running (`npx hardhat node` di port 8545)
+- [ ] Backend running (`npm run dev` on port 4000)
+- [ ] Blockchain running (`npx hardhat node` on port 8545)
 - [ ] Contracts deployed (addresses auto-written to frontend)
-- [ ] Frontend `.env` configured dengan contract addresses
-- [ ] ZK files present di `frontend/public/zk/`
-- [ ] MetaMask connected to Hardhat Local network
-- [ ] Frontend running (`npm run dev` di port 5173)
+- [ ] Frontend `.env` configured with contract addresses
+- [ ] ZK files present in `frontend/public/zk/`
+- [ ] MetaMask connected to the Hardhat Local network
+- [ ] Frontend running (`npm run dev` on port 5173)
 - [ ] SIWE login working
 - [ ] Ready to test!
 
@@ -529,4 +529,4 @@ Sebelum mulai development:
 
 **Happy coding! 🚀**
 
-Jika ada pertanyaan atau issues, buat issue di repository.
+If you have any questions or issues, open an issue in the repository.
