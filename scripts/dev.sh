@@ -3,7 +3,8 @@
 # Certify — one-command full-stack dev runner.
 #   ./scripts/dev.sh   (or: npm run dev)
 #
-# Installs missing deps, starts the Hardhat node, waits for RPC, deploys the
+# Installs missing deps, starts the local chain (Anvil with persistent on-disk
+# state if Foundry is installed, else a Hardhat node), waits for RPC, deploys the
 # contracts (writing deployment.json + ABI into the frontend), then runs the
 # backend and frontend. Ctrl+C stops everything cleanly.
 #
@@ -17,6 +18,9 @@ cd "$ROOT"
 LOGDIR="$ROOT/.dev-logs"
 mkdir -p "$LOGDIR"
 RPC="http://127.0.0.1:8545"
+
+# Make Foundry's tools (anvil) reachable even from a non-login shell.
+export PATH="$PATH:$HOME/.foundry/bin"
 
 say()  { printf "\033[1;36m▸ certify\033[0m %s\n" "$*"; }
 err()  { printf "\033[1;31m✗ certify\033[0m %s\n" "$*" >&2; }
@@ -39,18 +43,29 @@ for d in contracts backend frontend; do
   fi
 done
 
-# 2. Hardhat node (reuse one if it's already running)
+# 2. Local chain (reuse one if it's already running)
 if rpc_up; then
-  say "reusing the Hardhat node already running on :8545"
+  say "reusing the chain already running on :8545"
 else
-  say "starting Hardhat node on :8545…"
-  ( cd "$ROOT/contracts" && npx hardhat node ) > "$LOGDIR/hardhat.log" 2>&1 &
-  ( tail -n +1 -f "$LOGDIR/hardhat.log" | sed $'s/^/\033[90m[chain]\033[0m /' ) &
+  # Prefer Anvil (Foundry) with on-disk state so members/certificates survive a
+  # full stop/restart — even a reboot. --state loads the file on start and dumps
+  # to it on exit (including Ctrl+C). Anvil shares Hardhat's default mnemonic and
+  # chain id (31337), so accounts/addresses stay identical.
+  # Fall back to the Hardhat node when Anvil isn't installed (no persistence).
+  if command -v anvil >/dev/null 2>&1; then
+    say "starting Anvil on :8545 — persistent state at $LOGDIR/state.json (rm it for a clean chain)…"
+    ( anvil --host 127.0.0.1 --port 8545 --chain-id 31337 \
+        --state "$LOGDIR/state.json" ) > "$LOGDIR/chain.log" 2>&1 &
+  else
+    say "starting Hardhat node on :8545 — Anvil not found, so state will NOT persist across restarts (install Foundry for persistence)…"
+    ( cd "$ROOT/contracts" && npx hardhat node ) > "$LOGDIR/chain.log" 2>&1 &
+  fi
+  ( tail -n +1 -f "$LOGDIR/chain.log" | sed $'s/^/\033[90m[chain]\033[0m /' ) &
   say "waiting for RPC…"
   for i in $(seq 1 120); do
     rpc_up && break
     sleep 0.5
-    if [ "$i" -eq 120 ]; then err "RPC never came up — see $LOGDIR/hardhat.log"; exit 1; fi
+    if [ "$i" -eq 120 ]; then err "RPC never came up — see $LOGDIR/chain.log"; exit 1; fi
   done
 fi
 say "RPC ready."

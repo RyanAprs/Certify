@@ -27,16 +27,18 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
       <header className="sticky top-0 z-[1100] border-b border-line bg-paper/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5" aria-label="Certify home">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-white shadow-xs">
-              <ShieldCheck size={18} strokeWidth={2.25} aria-hidden="true" />
-            </span>
+            <img
+              src="/logo.png"
+              alt=""
+              className="h-28 w-28 rounded-lg object-contain"
+            />
             <span className="leading-none">
               <span className="block font-serif text-lg font-semibold tracking-tight text-ink">
                 Certify
               </span>
-              <span className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-ink-subtle">
+              {/* <span className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-ink-subtle">
                 {t("brand.subtitle")}
-              </span>
+              </span> */}
             </span>
           </Link>
 
@@ -110,12 +112,14 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
       <footer className="mt-8 border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-4 py-8 sm:flex-row sm:items-center sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">
-              <ShieldCheck size={16} strokeWidth={2.25} aria-hidden="true" />
-            </span>
+            <img
+              src="/logo.png"
+              alt=""
+              className="h-28 w-28 rounded-lg object-contain"
+            />
             <div className="leading-tight">
               <span className="block font-serif text-sm font-semibold text-ink">Certify</span>
-              <span className="block text-xs text-ink-subtle">{t("brand.subtitle")}</span>
+              {/* <span className="block text-xs text-ink-subtle">{t("brand.subtitle")}</span> */}
             </div>
           </div>
           <p className="max-w-md text-xs leading-relaxed text-ink-subtle">
