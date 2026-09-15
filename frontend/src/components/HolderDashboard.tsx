@@ -4,11 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { isAddress, keccak256, parseAbiItem, toBytes } from "viem";
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
-import { GraduationCap, UserPlus, Share2, BadgeCheck, FileText, Check } from "lucide-react";
-import clsx from "clsx";
+import { GraduationCap, UserPlus, Share2, BadgeCheck, FileText } from "lucide-react";
 
-import { useHolderCertificates } from "../hooks/useCertificates";
-import { useRegistryWrite } from "../hooks/useRegistryWrite";
+import { useHolderCertificates } from "@/hooks/useCertificates";
+import { useRegistryWrite } from "@/hooks/useRegistryWrite";
 import {
   CertificateCard,
   DataChip,
@@ -18,12 +17,23 @@ import {
   PageHeader,
   Spinner,
   SkeletonCard,
-} from "./Shared";
-import { uploadJson, fetchFromIpfs } from "../lib/ipfs";
-import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
-import { getSchema } from "../lib/schemas";
-import { CredentialMetadata } from "../lib/zkp";
-import { useT } from "../lib/i18n";
+} from "@/components/Shared";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { uploadJson, fetchFromIpfs } from "@/lib/ipfs";
+import { publicClient, registryContract, deploymentBlock } from "@/lib/contract";
+import { getSchema } from "@/lib/schemas";
+import { CredentialMetadata } from "@/lib/zkp";
+import { useT } from "@/lib/i18n";
 
 interface MembershipForm {
   issuer: string;
@@ -196,37 +206,39 @@ export const HolderDashboard = () => {
       )}
 
       {/* Join issuer */}
-      <form onSubmit={onMembership} className="panel-pad mb-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <UserPlus size={17} className="text-primary" aria-hidden="true" />
-          <h2 className="font-semibold text-ink">{t("join.title")}</h2>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          <div className="flex-1">
-            <input
-              className="input-mono"
-              placeholder={t("join.placeholder")}
-              disabled={isRequesting}
-              {...membershipForm.register("issuer", {
-                required: t("valid.issuerReq"),
-                validate: (v) => isAddress(v) || t("valid.addr"),
-              })}
-            />
-            {membershipForm.formState.errors.issuer && (
-              <p className="mt-1.5 text-xs text-danger-ink">
-                {membershipForm.formState.errors.issuer.message}
-              </p>
-            )}
+      <Card asChild>
+        <form onSubmit={onMembership} className="mb-6 space-y-4 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <UserPlus size={17} className="text-primary" aria-hidden="true" />
+            <h2 className="font-semibold text-ink">{t("join.title")}</h2>
           </div>
-          <button className="btn-primary sm:w-44" disabled={isRequesting}>
-            <UserPlus size={16} aria-hidden="true" />
-            {isRequesting ? t("join.requesting") : t("join.request")}
-          </button>
-        </div>
-      </form>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex-1">
+              <Input
+                className="font-mono text-[0.8125rem] tracking-tight"
+                placeholder={t("join.placeholder")}
+                disabled={isRequesting}
+                {...membershipForm.register("issuer", {
+                  required: t("valid.issuerReq"),
+                  validate: (v) => isAddress(v) || t("valid.addr"),
+                })}
+              />
+              {membershipForm.formState.errors.issuer && (
+                <p className="mt-1.5 text-xs text-danger-ink">
+                  {membershipForm.formState.errors.issuer.message}
+                </p>
+              )}
+            </div>
+            <Button type="submit" className="sm:w-44" disabled={isRequesting}>
+              <UserPlus size={16} aria-hidden="true" />
+              {isRequesting ? t("join.requesting") : t("join.request")}
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       {/* Share panel */}
-      <div className="panel-pad space-y-5">
+      <Card className="space-y-5 p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Share2 size={17} className="text-primary" aria-hidden="true" />
           <h2 className="font-semibold text-ink">{t("share.title")}</h2>
@@ -234,25 +246,25 @@ export const HolderDashboard = () => {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("share.credential")}>
-            <select
-              className="input"
-              value={shareId}
-              onChange={(e) => setShareId(e.target.value)}
-            >
-              <option value="">{t("share.select")}</option>
-              {certificates?.map((c) => {
-                const s = getSchema(c.schemaId);
-                return (
-                  <option key={c.id.toString()} value={c.id.toString()}>
-                    №{c.id.toString().padStart(4, "0")} · {s?.label ?? "Credential"}
-                  </option>
-                );
-              })}
-            </select>
+            <Select value={shareId || undefined} onValueChange={setShareId}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("share.select")} />
+              </SelectTrigger>
+              <SelectContent>
+                {certificates?.map((c) => {
+                  const s = getSchema(c.schemaId);
+                  return (
+                    <SelectItem key={c.id.toString()} value={c.id.toString()}>
+                      №{c.id.toString().padStart(4, "0")} · {s ? tt(`schema.${s.type}`, s.label) : "Credential"}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label={t("share.verifier")}>
-            <input
-              className="input-mono"
+            <Input
+              className="font-mono text-[0.8125rem] tracking-tight"
               placeholder="0x…"
               value={verifierAddr}
               onChange={(e) => setVerifierAddr(e.target.value)}
@@ -261,43 +273,27 @@ export const HolderDashboard = () => {
         </div>
 
         {!shareCert ? (
-          <p className="text-sm text-ink-subtle">
-            Pick one of your credentials to choose which fields to disclose.
-          </p>
+          <p className="text-sm text-ink-subtle">{t("share.selectPrompt")}</p>
         ) : metaLoading ? (
           <Spinner label={t("load.fields")} />
         ) : (
           <>
             <div>
-              <span className="label">{t("share.fields")}</span>
-              <div className="flex flex-wrap gap-2">
+              <span className="mb-1.5 block text-[0.8125rem] font-medium text-ink-muted">
+                {t("share.fields")}
+              </span>
+              <div className="grid gap-2 sm:grid-cols-2">
                 {fields.map((f) => {
                   const on = selected.has(f.key);
                   return (
-                    <button
+                    <label
                       key={f.key}
-                      type="button"
-                      onClick={() => toggle(f.key)}
-                      aria-pressed={on}
-                      className={clsx(
-                        "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition",
-                        on
-                          ? "border-primary bg-primary-tint text-ink"
-                          : "border-line-strong text-ink-muted hover:border-primary/40"
-                      )}
+                      className="flex cursor-pointer items-center gap-3 rounded-md border border-line-strong bg-surface px-3 py-2 text-sm transition hover:border-primary/40 has-[:focus-visible]:border-primary"
                     >
-                      <span
-                        className={clsx(
-                          "grid h-4 w-4 place-items-center rounded border",
-                          on ? "border-primary bg-primary text-white" : "border-line-strong"
-                        )}
-                        aria-hidden="true"
-                      >
-                        {on && <Check size={11} strokeWidth={3} />}
-                      </span>
-                      <span className="font-medium">{tt(`field.${f.key}`, f.label)}</span>
-                      <span className="max-w-[10rem] truncate text-ink-subtle">{f.value}</span>
-                    </button>
+                      <Checkbox checked={on} onCheckedChange={() => toggle(f.key)} />
+                      <span className="font-medium text-ink">{tt(`field.${f.key}`, f.label)}</span>
+                      <span className="ml-auto max-w-[10rem] truncate text-ink-subtle">{f.value}</span>
+                    </label>
                   );
                 })}
               </div>
@@ -305,13 +301,15 @@ export const HolderDashboard = () => {
 
             <Notice tone="info">{t("share.notice")}</Notice>
 
-            <button className="btn-primary w-full sm:w-auto" onClick={onShare} disabled={isSharing}>
+            <Button className="w-full sm:w-auto" onClick={onShare} disabled={isSharing}>
               <Share2 size={16} aria-hidden="true" />
-              {isSharing ? t("share.sharing") : t(selected.size === 1 ? "share.submit_one" : "share.submit", { n: selected.size })}
-            </button>
+              {isSharing
+                ? t("share.sharing")
+                : t(selected.size === 1 ? "share.submit_one" : "share.submit", { n: selected.size })}
+            </Button>
           </>
         )}
-      </div>
+      </Card>
 
       {/* Certificates */}
       <div className="mt-10">
@@ -329,8 +327,7 @@ export const HolderDashboard = () => {
           </div>
         ) : (
           <EmptyState icon={<FileText size={28} />} title={t("creds.empty")}>
-            Once an issuer you've joined grants you a certificate, it will appear
-            here — ready to share.
+            {t("creds.emptyBody")}
           </EmptyState>
         )}
       </div>

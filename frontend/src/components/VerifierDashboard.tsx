@@ -1,17 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import toast from "react-hot-toast";
-import clsx from "clsx";
 import { Search, ShieldCheck, Cpu, FileCheck, History, CircleCheck } from "lucide-react";
 
-import { useDisclosures } from "../hooks/useCertificates";
-import { useRegistryWrite } from "../hooks/useRegistryWrite";
-import { publicClient, registryContract } from "../lib/contract";
-import { fetchFromIpfs, ipfsUrl } from "../lib/ipfs";
-import { DataChip, EmptyState, Field, Notice, PageHeader, Spinner, StatusBadge } from "./Shared";
-import { CertificateStatus } from "../types";
-import { getSchema, Schema, Predicate } from "../lib/schemas";
-import { useT } from "../lib/i18n";
+import { useDisclosures } from "@/hooks/useCertificates";
+import { useRegistryWrite } from "@/hooks/useRegistryWrite";
+import { publicClient, registryContract } from "@/lib/contract";
+import { fetchFromIpfs, ipfsUrl } from "@/lib/ipfs";
+import {
+  DataChip,
+  EmptyState,
+  Field,
+  Notice,
+  PageHeader,
+  Spinner,
+  StatusBadge,
+} from "@/components/Shared";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { CertificateStatus } from "@/types";
+import { getSchema, Schema, Predicate } from "@/lib/schemas";
+import { useT } from "@/lib/i18n";
 import {
   generateRangeProof,
   generateEqualityProof,
@@ -21,7 +33,7 @@ import {
   validateZkFiles,
   CredentialMetadata,
   ZKProof,
-} from "../lib/zkp";
+} from "@/lib/zkp";
 
 interface Cert {
   id: bigint;
@@ -194,6 +206,31 @@ export const VerifierDashboard = () => {
     }
   };
 
+  // Reusable pill toggle for claim / predicate selection.
+  const Pill = ({
+    active,
+    onClick,
+    children,
+  }: {
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "rounded-md border px-3 py-1.5 text-sm font-medium transition",
+        active
+          ? "border-primary bg-primary-tint text-ink"
+          : "border-line-strong text-ink-muted hover:border-primary/40"
+      )}
+    >
+      {children}
+    </button>
+  );
+
   return (
     <section>
       <PageHeader
@@ -213,23 +250,23 @@ export const VerifierDashboard = () => {
       )}
 
       {/* Search */}
-      <div className="panel-pad">
+      <Card className="p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-2">
           <Search size={17} className="text-primary" aria-hidden="true" />
           <h2 className="font-semibold text-ink">{t("search.title")}</h2>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            className="input flex-1"
+          <Input
+            className="flex-1"
             placeholder={t("search.placeholder")}
             value={certificateId}
             onChange={(e) => setCertificateId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSearch()}
           />
-          <button className="btn-primary sm:w-36" onClick={onSearch} disabled={isSearching}>
+          <Button className="sm:w-36" onClick={onSearch} disabled={isSearching}>
             <Search size={16} aria-hidden="true" />
             {isSearching ? t("search.searching") : t("search.button")}
-          </button>
+          </Button>
         </div>
 
         {cert && (
@@ -239,9 +276,9 @@ export const VerifierDashboard = () => {
                 {metadata ? (
                   <>
                     <div className="mb-1">
-                      <span className="badge border-primary/25 bg-primary-tint text-primary">
+                      <Badge tone="primary">
                         {schema ? tt(`schema.${schema.type}`, schema.label) : "Unknown type"}
-                      </span>
+                      </Badge>
                     </div>
                     <h3 className="font-serif text-xl font-semibold text-ink">{metadata.name}</h3>
                     <p className="text-sm text-ink-muted">
@@ -250,7 +287,7 @@ export const VerifierDashboard = () => {
                   </>
                 ) : (
                   <p className="text-sm text-ink-muted">
-                    Certificate №{cert.id.toString().padStart(4, "0")}
+                    №{cert.id.toString().padStart(4, "0")}
                   </p>
                 )}
               </div>
@@ -263,11 +300,11 @@ export const VerifierDashboard = () => {
             </dl>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Presentation request */}
       {metadata && schema && claimField && (
-        <div className="panel-pad mt-6 space-y-5">
+        <Card className="mt-6 space-y-5 p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <Cpu size={17} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-ink">{t("proof.title")}</h2>
@@ -276,22 +313,14 @@ export const VerifierDashboard = () => {
           {/* Claim */}
           {schema.claims.length > 1 && (
             <div>
-              <span className="label">{t("proof.claim")}</span>
+              <span className="mb-1.5 block text-[0.8125rem] font-medium text-ink-muted">
+                {t("proof.claim")}
+              </span>
               <div className="flex flex-wrap gap-2">
                 {schema.claims.map((f) => (
-                  <button
-                    key={f.key}
-                    type="button"
-                    onClick={() => selectClaim(f.key)}
-                    className={clsx(
-                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
-                      f.key === claimKey
-                        ? "border-primary bg-primary-tint text-ink"
-                        : "border-line-strong text-ink-muted hover:border-primary/40"
-                    )}
-                  >
+                  <Pill key={f.key} active={f.key === claimKey} onClick={() => selectClaim(f.key)}>
                     {tt(`field.${f.key}`, f.label)}
-                  </button>
+                  </Pill>
                 ))}
               </div>
             </div>
@@ -300,25 +329,21 @@ export const VerifierDashboard = () => {
           {/* Predicate */}
           {claimField.predicates.length > 1 && (
             <div>
-              <span className="label">{t("proof.statement")}</span>
+              <span className="mb-1.5 block text-[0.8125rem] font-medium text-ink-muted">
+                {t("proof.statement")}
+              </span>
               <div className="flex flex-wrap gap-2">
                 {claimField.predicates.map((p) => (
-                  <button
+                  <Pill
                     key={p}
-                    type="button"
+                    active={p === predicate}
                     onClick={() => {
                       setPredicate(p);
                       setZkProof(null);
                     }}
-                    className={clsx(
-                      "rounded-md border px-3 py-1.5 text-sm font-medium transition",
-                      p === predicate
-                        ? "border-primary bg-primary-tint text-ink"
-                        : "border-line-strong text-ink-muted hover:border-primary/40"
-                    )}
                   >
                     {t(`pred.${p}`)}
-                  </button>
+                  </Pill>
                 ))}
               </div>
             </div>
@@ -328,15 +353,14 @@ export const VerifierDashboard = () => {
           <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
             {isExpiry ? (
               <p className="text-sm text-ink-muted">
-                Proves <strong>{claimField.label}</strong> ≥ now — i.e. the credential is not expired.
+                {t("expiry.note", { label: tt(`field.${claimField.key}`, claimField.label) })}
               </p>
             ) : predicate === "membership" ? (
               <Field
                 label={t("proof.setLabel", { label: tt(`field.${claimField.key}`, claimField.label) })}
                 hint={t("hint.set")}
               >
-                <input
-                  className="input"
+                <Input
                   type="text"
                   value={setValues}
                   onChange={(e) => setSetValues(e.target.value)}
@@ -344,9 +368,11 @@ export const VerifierDashboard = () => {
                 />
               </Field>
             ) : predicate === "equality" ? (
-              <Field label={t("proof.eqLabel", { label: tt(`field.${claimField.key}`, claimField.label) })} hint={t("hint.eq")}>
-                <input
-                  className="input"
+              <Field
+                label={t("proof.eqLabel", { label: tt(`field.${claimField.key}`, claimField.label) })}
+                hint={t("hint.eq")}
+              >
+                <Input
                   type={claimField.kind === "number" ? "number" : "text"}
                   value={eqValue}
                   onChange={(e) => setEqValue(e.target.value)}
@@ -358,12 +384,15 @@ export const VerifierDashboard = () => {
                 label={t("proof.min", { label: tt(`field.${claimField.key}`, claimField.label) })}
                 hint={
                   claimField.min !== undefined
-                    ? t("hint.threshold", { label: tt(`field.${claimField.key}`, claimField.label), min: claimField.min ?? "", max: claimField.max ?? "" })
+                    ? t("hint.threshold", {
+                        label: tt(`field.${claimField.key}`, claimField.label),
+                        min: claimField.min ?? "",
+                        max: claimField.max ?? "",
+                      })
                     : t("hint.hidden")
                 }
               >
-                <input
-                  className="input"
+                <Input
                   type="number"
                   min={claimField.min}
                   max={claimField.max}
@@ -373,14 +402,14 @@ export const VerifierDashboard = () => {
                 />
               </Field>
             )}
-            <button
-              className="btn-secondary"
+            <Button
+              variant="secondary"
               onClick={onGenerateProof}
               disabled={zkLoading || zkFilesOk === false}
             >
               <Cpu size={16} aria-hidden="true" />
               {zkLoading ? t("proof.generating") : t("proof.generate")}
-            </button>
+            </Button>
           </div>
 
           {zkLoading && <Spinner label={t("load.proof")} />}
@@ -396,22 +425,14 @@ export const VerifierDashboard = () => {
                   </span>
                 )}
               </div>
-              <button
-                className="btn-primary w-full"
-                onClick={onVerifyOnChain}
-                disabled={isVerifying || !isConnected}
-              >
+              <Button className="w-full" onClick={onVerifyOnChain} disabled={isVerifying || !isConnected}>
                 <FileCheck size={16} aria-hidden="true" />
                 {isVerifying ? t("proof.verifying") : t("proof.verify")}
-              </button>
-              {!isConnected && (
-                <p className="text-xs text-pending-ink">
-                  {t("proof.connectNote")}
-                </p>
-              )}
+              </Button>
+              {!isConnected && <p className="text-xs text-pending-ink">{t("proof.connectNote")}</p>}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Disclosures */}
@@ -425,7 +446,7 @@ export const VerifierDashboard = () => {
             {disclosures.map((d: any, idx: number) => (
               <li
                 key={`${d.verifier}-${d.timestamp.toString()}-${idx}`}
-                className="panel space-y-2 p-4"
+                className="rounded-xl border border-line bg-surface p-4 shadow-sm"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <DataChip label="verifier" value={d.verifier} />
@@ -433,7 +454,7 @@ export const VerifierDashboard = () => {
                     <DataChip label="payload" value={d.encryptedPayloadCid} href={ipfsUrl(d.encryptedPayloadCid)} />
                   )}
                 </div>
-                <p className="font-mono text-[0.7rem] text-ink-subtle">
+                <p className="mt-2 font-mono text-[0.7rem] text-ink-subtle">
                   {new Date(Number(d.timestamp) * 1000).toLocaleString()}
                 </p>
               </li>
@@ -441,7 +462,7 @@ export const VerifierDashboard = () => {
           </ul>
         ) : (
           <EmptyState icon={<History size={26} />} title={t("disc.empty")}>
-            Search a certificate above to see who it has been shared with.
+            {t("disc.emptyBody")}
           </EmptyState>
         )}
       </div>

@@ -5,13 +5,13 @@ import { isAddress, parseAbiItem } from "viem";
 import toast from "react-hot-toast";
 import { useState } from "react";
 import { Stamp, UserCheck, UserX, Users, Inbox, FileText, ShieldPlus, X } from "lucide-react";
-import clsx from "clsx";
 
-import { useIssuerCertificates } from "../hooks/useCertificates";
-import { useRegistryWrite } from "../hooks/useRegistryWrite";
-import { useMemberRequests } from "../hooks/useMemberRequests";
-import { useRole } from "../context/RoleContext";
-import { useT } from "../lib/i18n";
+import { useIssuerCertificates } from "@/hooks/useCertificates";
+import { useRegistryWrite } from "@/hooks/useRegistryWrite";
+import { useMemberRequests } from "@/hooks/useMemberRequests";
+import { useRole } from "@/context/RoleContext";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import {
   CertificateCard,
   DataChip,
@@ -20,11 +20,15 @@ import {
   PageHeader,
   Skeleton,
   SkeletonCard,
-} from "./Shared";
-import { uploadFile, uploadJson } from "../lib/ipfs";
-import { publicClient, registryContract, deploymentBlock } from "../lib/contract";
-import { SCHEMAS, Schema } from "../lib/schemas";
-import { CredentialMetadata, buildCommitment } from "../lib/zkp";
+} from "@/components/Shared";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { uploadFile, uploadJson } from "@/lib/ipfs";
+import { publicClient, registryContract, deploymentBlock } from "@/lib/contract";
+import { SCHEMAS, Schema } from "@/lib/schemas";
+import { CredentialMetadata, buildCommitment } from "@/lib/zkp";
 
 type IssueForm = {
   holder: string;
@@ -195,29 +199,28 @@ export const IssuerDashboard = () => {
       />
 
       {isAdmin && (
-        <div className="panel-pad mb-6 border-primary/30 bg-primary-tint/40">
+        <Card className="mb-6 border-primary/30 bg-primary-tint/40 p-5 sm:p-6">
           <div className="mb-1 flex items-center gap-2">
             <ShieldPlus size={17} className="text-primary" aria-hidden="true" />
             <h2 className="font-semibold text-ink">{t("admin.title")}</h2>
           </div>
-          <p className="mb-4 text-sm text-ink-muted">
-            {t("admin.desc")}
-          </p>
+          <p className="mb-4 text-sm text-ink-muted">{t("admin.desc")}</p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              className="input-mono flex-1"
+            <Input
+              className="flex-1 font-mono text-[0.8125rem] tracking-tight"
               placeholder={t("admin.placeholder")}
               value={issuerAddr}
               onChange={(e) => setIssuerAddr(e.target.value)}
             />
-            <button
-              className="btn-secondary sm:w-48"
+            <Button
+              variant="secondary"
+              className="sm:w-48"
               onClick={onRegisterIssuer}
               disabled={registering}
             >
               <ShieldPlus size={16} aria-hidden="true" />
               {registering ? t("admin.registering") : t("admin.register")}
-            </button>
+            </Button>
           </div>
           {issuers && issuers.length > 0 && (
             <div className="mt-4">
@@ -243,165 +246,165 @@ export const IssuerDashboard = () => {
               </ul>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         {/* Issue */}
-        <form onSubmit={onIssue} className="panel-pad space-y-4">
-          <div className="flex items-center gap-2">
-            <FileText size={17} className="text-primary" aria-hidden="true" />
-            <h2 className="font-semibold text-ink">{t("issue.title")}</h2>
-          </div>
+        <Card asChild>
+          <form onSubmit={onIssue} className="space-y-4 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <FileText size={17} className="text-primary" aria-hidden="true" />
+              <h2 className="font-semibold text-ink">{t("issue.title")}</h2>
+            </div>
 
-          {/* Credential type */}
-          <div>
-            <span className="label">{t("issue.type")}</span>
-            <div className="grid grid-cols-2 gap-2">
-              {SCHEMAS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setSchema(s);
-                    form.resetField("claims");
-                  }}
-                  className={clsx(
-                    "rounded-md border px-3 py-2 text-left text-sm transition",
-                    s.id === schema.id
-                      ? "border-primary bg-primary-tint text-ink"
-                      : "border-line-strong bg-surface text-ink-muted hover:border-primary/40"
-                  )}
-                >
-                  <span className="block font-semibold">{tt(`schema.${s.type}`, s.label)}</span>
-                  <span className="block text-xs text-ink-subtle">{s.type}.{s.version}</span>
-                </button>
+            {/* Credential type */}
+            <div>
+              <span className="mb-1.5 block text-[0.8125rem] font-medium text-ink-muted">
+                {t("issue.type")}
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {SCHEMAS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setSchema(s);
+                      form.resetField("claims");
+                    }}
+                    aria-pressed={s.id === schema.id}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-left text-sm transition",
+                      s.id === schema.id
+                        ? "border-primary bg-primary-tint text-ink"
+                        : "border-line-strong bg-surface text-ink-muted hover:border-primary/40"
+                    )}
+                  >
+                    <span className="block font-semibold">{tt(`schema.${s.type}`, s.label)}</span>
+                    <span className="block text-xs text-ink-subtle">
+                      {s.type}.{s.version}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Field label={t("issue.holder")} error={errors.holder?.message}>
+              <Input
+                className="font-mono text-[0.8125rem] tracking-tight"
+                placeholder="0x…"
+                disabled={isIssuing}
+                {...form.register("holder", {
+                  required: t("valid.holderReq"),
+                  validate: (v) => isAddress(v) || t("valid.addr"),
+                })}
+              />
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {schema.display.map((f) => (
+                <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
+                  <Field label={tt(`field.${f.key}`, f.label)}>
+                    {f.type === "textarea" ? (
+                      <Textarea
+                        placeholder={f.placeholder}
+                        disabled={isIssuing}
+                        {...form.register(`display.${f.key}` as const, { required: f.required })}
+                      />
+                    ) : (
+                      <Input
+                        placeholder={f.placeholder}
+                        disabled={isIssuing}
+                        {...form.register(`display.${f.key}` as const, { required: f.required })}
+                      />
+                    )}
+                  </Field>
+                </div>
               ))}
             </div>
-          </div>
 
-          <Field label={t("issue.holder")} error={errors.holder?.message}>
-            <input
-              className="input-mono"
-              placeholder="0x…"
-              disabled={isIssuing}
-              {...form.register("holder", {
-                required: t("valid.holderReq"),
-                validate: (v) => isAddress(v) || t("valid.addr"),
-              })}
-            />
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {schema.display.map((f) => (
-              <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                <Field label={tt(`field.${f.key}`, f.label)}>
-                  {f.type === "textarea" ? (
-                    <textarea
-                      className="input min-h-[80px] resize-y"
-                      placeholder={f.placeholder}
-                      disabled={isIssuing}
-                      {...form.register(`display.${f.key}` as const, { required: f.required })}
-                    />
-                  ) : (
-                    <input
-                      className="input"
-                      placeholder={f.placeholder}
-                      disabled={isIssuing}
-                      {...form.register(`display.${f.key}` as const, { required: f.required })}
-                    />
-                  )}
-                </Field>
+            {/* Provable claims (private) */}
+            <div className="rounded-lg border border-line bg-sunken/40 p-4">
+              <p className="mb-3 text-sm font-medium text-ink">
+                {t("issue.claimsTitle")}{" "}
+                <span className="font-normal text-ink-subtle">{t("hint.claims")}</span>
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {schema.claims.map((f) => {
+                  const inputType =
+                    f.kind === "timestamp" ? "date" : f.kind === "string" ? "text" : "number";
+                  const hint =
+                    f.kind === "number" && f.min !== undefined
+                      ? `${f.min}–${f.max}${f.unit ? ` ${f.unit}` : ""}`
+                      : f.kind === "timestamp"
+                      ? t("issue.expiryHint")
+                      : undefined;
+                  return (
+                    <Field
+                      key={f.key}
+                      label={tt(`field.${f.key}`, f.label)}
+                      hint={hint}
+                      error={(errors.claims as any)?.[f.key]?.message}
+                    >
+                      <Input
+                        type={inputType}
+                        {...(f.kind === "number"
+                          ? { min: f.min, max: f.max, step: f.step ?? "any" }
+                          : {})}
+                        disabled={isIssuing}
+                        {...form.register(`claims.${f.key}` as const, {
+                          required: t("valid.fieldReq", { label: tt(`field.${f.key}`, f.label) }),
+                          validate: (v) => {
+                            if (f.kind !== "number") return true;
+                            const n = parseFloat(v);
+                            return (
+                              (!isNaN(n) &&
+                                n >= (f.min ?? -Infinity) &&
+                                n <= (f.max ?? Infinity)) ||
+                              t("valid.range", { min: f.min ?? "", max: f.max ?? "" })
+                            );
+                          },
+                        })}
+                      />
+                    </Field>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-
-          {/* Provable claims (private) */}
-          <div className="rounded-lg border border-line bg-sunken/40 p-4">
-            <p className="mb-3 text-sm font-medium text-ink">
-              {t("issue.claimsTitle")}{" "}
-              <span className="font-normal text-ink-subtle">
-                {t("hint.claims")}
-              </span>
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {schema.claims.map((f) => {
-                const inputType =
-                  f.kind === "timestamp" ? "date" : f.kind === "string" ? "text" : "number";
-                const hint =
-                  f.kind === "number" && f.min !== undefined
-                    ? `${f.min}–${f.max}${f.unit ? ` ${f.unit}` : ""}`
-                    : f.kind === "timestamp"
-                    ? t("issue.expiryHint")
-                    : undefined;
-                return (
-                  <Field
-                    key={f.key}
-                    label={tt(`field.${f.key}`, f.label)}
-                    hint={hint}
-                    error={(errors.claims as any)?.[f.key]?.message}
-                  >
-                    <input
-                      className="input"
-                      type={inputType}
-                      {...(f.kind === "number"
-                        ? { min: f.min, max: f.max, step: f.step ?? "any" }
-                        : {})}
-                      disabled={isIssuing}
-                      {...form.register(`claims.${f.key}` as const, {
-                        required: t("valid.fieldReq", { label: tt(`field.${f.key}`, f.label) }),
-                        validate: (v) => {
-                          if (f.kind !== "number") return true;
-                          const n = parseFloat(v);
-                          return (
-                            (!isNaN(n) &&
-                              n >= (f.min ?? -Infinity) &&
-                              n <= (f.max ?? Infinity)) ||
-                            t("valid.range", { min: f.min ?? "", max: f.max ?? "" })
-                          );
-                        },
-                      })}
-                    />
-                  </Field>
-                );
-              })}
             </div>
-          </div>
 
-          <Field label={t("issue.image")} hint={t("hint.imgTypes")}>
-            <input
-              className="input file:mr-3 file:rounded file:border-0 file:bg-sunken file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
-              type="file"
-              accept="image/*"
-              disabled={isIssuing}
-              {...form.register("image", { required: true })}
-            />
-          </Field>
+            <Field label={t("issue.image")} hint={t("hint.imgTypes")}>
+              <Input type="file" accept="image/*" disabled={isIssuing} {...form.register("image", { required: true })} />
+            </Field>
 
-          <button className="btn-primary w-full" disabled={isIssuing}>
-            <Stamp size={16} aria-hidden="true" />
-            {isIssuing ? t("issue.submitting") : t("issue.submit", { type: tt(`schema.${schema.type}`, schema.label).toLowerCase() })}
-          </button>
-        </form>
+            <Button type="submit" className="w-full" disabled={isIssuing}>
+              <Stamp size={16} aria-hidden="true" />
+              {isIssuing
+                ? t("issue.submitting")
+                : t("issue.submit", { type: tt(`schema.${schema.type}`, schema.label).toLowerCase() })}
+            </Button>
+          </form>
+        </Card>
 
         {/* Membership */}
         <div className="space-y-6">
-          <div className="panel-pad">
+          <Card className="p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Inbox size={17} className="text-primary" aria-hidden="true" />
                 <h2 className="font-semibold text-ink">{t("pending.title")}</h2>
               </div>
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 onClick={() => {
                   refetchMembers();
                   refreshRole();
                 }}
                 disabled={membersLoading}
-                className="text-xs font-semibold text-primary transition hover:text-primary-hover disabled:opacity-50"
+                className="h-auto p-0 text-xs"
               >
                 {membersLoading ? t("common.refreshing") : t("common.refresh")}
-              </button>
+              </Button>
             </div>
 
             {membersLoading ? (
@@ -411,7 +414,7 @@ export const IssuerDashboard = () => {
               </div>
             ) : (members?.pending.length ?? 0) === 0 ? (
               <EmptyState icon={<Inbox size={26} />} title={t("pending.empty")}>
-                When a holder requests membership, they'll appear here for approval.
+                {t("pending.emptyBody")}
               </EmptyState>
             ) : (
               <ul className="space-y-2">
@@ -422,29 +425,34 @@ export const IssuerDashboard = () => {
                   >
                     <DataChip value={holder} />
                     <div className="flex gap-2">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => onDecision(holder, true)}
                         disabled={processing === holder}
-                        className="btn-secondary flex-1 sm:flex-none"
+                        className="flex-1 sm:flex-none"
                       >
                         <UserCheck size={15} aria-hidden="true" />
                         {processing === holder ? "…" : t("approve")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => onDecision(holder, false)}
                         disabled={processing === holder}
-                        className="btn-ghost text-danger-ink hover:bg-danger-tint"
+                        className="text-danger-ink hover:bg-danger-tint"
+                        aria-label={t("op.rejecting")}
                       >
                         <UserX size={15} aria-hidden="true" />
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
+          </Card>
 
-          <div className="panel-pad">
+          <Card className="p-5 sm:p-6">
             <div className="mb-4 flex items-center gap-2">
               <Users size={17} className="text-primary" aria-hidden="true" />
               <h2 className="font-semibold text-ink">{t("members.title")}</h2>
@@ -460,7 +468,7 @@ export const IssuerDashboard = () => {
                 ))}
               </ul>
             )}
-          </div>
+          </Card>
         </div>
       </div>
 
@@ -482,8 +490,7 @@ export const IssuerDashboard = () => {
           </div>
         ) : (
           <EmptyState icon={<FileText size={28} />} title={t("issued.empty")}>
-            Approve a holder above, then issue their first credential. It will be
-            recorded on-chain with a zero-knowledge commitment.
+            {t("issued.emptyBody")}
           </EmptyState>
         )}
       </div>

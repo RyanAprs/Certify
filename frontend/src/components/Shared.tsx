@@ -1,5 +1,4 @@
 import { ReactNode, useEffect, useState } from "react";
-import clsx from "clsx";
 import { format } from "date-fns";
 import {
   Copy,
@@ -16,12 +15,19 @@ import {
 import toast from "react-hot-toast";
 import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { Certificate, CertificateStatus } from "../types";
-import { fetchJson, ipfsUrl } from "../lib/ipfs";
-import { getSchema } from "../lib/schemas";
-import { useRole } from "../context/RoleContext";
-import { useRegistryWrite } from "../hooks/useRegistryWrite";
-import { useT } from "../lib/i18n";
+import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Certificate, CertificateStatus } from "@/types";
+import { fetchJson, ipfsUrl } from "@/lib/ipfs";
+import { getSchema } from "@/lib/schemas";
+import { useRole } from "@/context/RoleContext";
+import { useRegistryWrite } from "@/hooks/useRegistryWrite";
+import { useT } from "@/lib/i18n";
 
 /* ---------------- helpers ---------------- */
 
@@ -41,9 +47,11 @@ async function copyText(text: string, label = "Copied to clipboard") {
 
 /* ---------------- primitives ---------------- */
 
+export { Skeleton };
+
 export function Spinner({ label, className }: { label?: string; className?: string }) {
   return (
-    <span className={clsx("inline-flex items-center gap-2 text-ink-muted", className)} role="status">
+    <span className={cn("inline-flex items-center gap-2 text-ink-muted", className)} role="status">
       <span
         className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-primary"
         aria-hidden="true"
@@ -54,13 +62,9 @@ export function Spinner({ label, className }: { label?: string; className?: stri
   );
 }
 
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx("skeleton", className)} aria-hidden="true" />;
-}
-
 export function SkeletonCard() {
   return (
-    <div className="panel-pad space-y-4" aria-hidden="true">
+    <Card className="space-y-4 p-5 sm:p-6" aria-hidden="true">
       <div className="flex items-center justify-between">
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-5 w-20 rounded-full" />
@@ -71,15 +75,15 @@ export function SkeletonCard() {
         <Skeleton className="h-3.5 w-1/3" />
       </div>
       <Skeleton className="h-9 w-full" />
-    </div>
+    </Card>
   );
 }
 
-const NOTICE = {
-  info: { cls: "border-primary/25 bg-primary-tint", Icon: Info, iconCls: "text-primary" },
-  warning: { cls: "border-pending/40 bg-pending-tint", Icon: TriangleAlert, iconCls: "text-pending-ink" },
-  danger: { cls: "border-danger/35 bg-danger-tint", Icon: FileWarning, iconCls: "text-danger-ink" },
-  success: { cls: "border-valid/35 bg-valid-tint", Icon: CircleCheck, iconCls: "text-valid-ink" },
+const NOTICE_ICON = {
+  info: Info,
+  warning: TriangleAlert,
+  danger: FileWarning,
+  success: CircleCheck,
 } as const;
 
 export function Notice({
@@ -87,38 +91,36 @@ export function Notice({
   title,
   children,
 }: {
-  tone?: keyof typeof NOTICE;
+  tone?: keyof typeof NOTICE_ICON;
   title?: string;
   children: ReactNode;
 }) {
-  const { cls, Icon, iconCls } = NOTICE[tone];
+  const Icon = NOTICE_ICON[tone];
   return (
-    <div className={clsx("flex gap-3 rounded-xl border p-4", cls)} role="note">
-      <Icon size={18} className={clsx("mt-0.5 shrink-0", iconCls)} aria-hidden="true" />
-      <div className="min-w-0 text-sm leading-relaxed text-ink">
-        {title && <p className="mb-0.5 font-semibold">{title}</p>}
-        <div className="text-ink-muted [&_code]:rounded [&_code]:bg-sunken [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.8em] [&_code]:text-ink">
-          {children}
-        </div>
+    <Alert tone={tone}>
+      <Icon aria-hidden="true" />
+      <div className="min-w-0">
+        {title && <AlertTitle>{title}</AlertTitle>}
+        <AlertDescription>{children}</AlertDescription>
       </div>
-    </div>
+    </Alert>
   );
 }
 
-const STATUS: Record<CertificateStatus, { cls: string; Icon: typeof BadgeCheck; label: string }> = {
-  Active: { cls: "border-valid/30 bg-valid-tint text-valid-ink", Icon: BadgeCheck, label: "Active" },
-  Pending: { cls: "border-pending/40 bg-pending-tint text-pending-ink", Icon: Clock, label: "Pending" },
-  Revoked: { cls: "border-danger/30 bg-danger-tint text-danger-ink", Icon: Ban, label: "Revoked" },
+const STATUS_TONE: Record<CertificateStatus, { tone: "valid" | "pending" | "danger"; Icon: typeof BadgeCheck }> = {
+  Active: { tone: "valid", Icon: BadgeCheck },
+  Pending: { tone: "pending", Icon: Clock },
+  Revoked: { tone: "danger", Icon: Ban },
 };
 
 export function StatusBadge({ status }: { status: CertificateStatus }) {
   const { t } = useT();
-  const { cls, Icon } = STATUS[status];
+  const { tone, Icon } = STATUS_TONE[status];
   return (
-    <span className={clsx("badge", cls)}>
+    <Badge tone={tone}>
       <Icon size={13} aria-hidden="true" />
       {t(`status.${status}`)}
-    </span>
+    </Badge>
   );
 }
 
@@ -135,7 +137,7 @@ export function DataChip({
   truncate?: boolean;
 }) {
   return (
-    <span className="chip-mono">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-sunken px-2 py-1 font-mono text-[0.75rem] text-ink-muted">
       {label && <span className="text-ink-subtle">{label}</span>}
       <span className="truncate">{truncate ? truncateMiddle(value, 8, 6) : value}</span>
       <button
@@ -185,16 +187,20 @@ export function Field({
   label,
   hint,
   error,
+  htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
   error?: string;
+  htmlFor?: string;
   children: ReactNode;
 }) {
   return (
     <div>
-      <label className="label">{label}</label>
+      <Label htmlFor={htmlFor} className="mb-1.5">
+        {label}
+      </Label>
       {children}
       {error ? (
         <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-danger-ink">
@@ -224,7 +230,10 @@ export function PageHeader({
   return (
     <header className="mb-8 flex flex-col gap-4 border-b border-line pb-6 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex items-start gap-4">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-primary shadow-xs" aria-hidden="true">
+        <span
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-primary shadow-xs"
+          aria-hidden="true"
+        >
           {icon}
         </span>
         <div>
@@ -307,7 +316,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
   const verified = certificate.status === "Active";
 
   return (
-    <article className="group overflow-hidden rounded-xl border border-line bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md">
+    <Card className="group overflow-hidden transition-shadow duration-200 hover:shadow-md">
       {/* Ruled masthead — a document header, not an eyebrow kicker */}
       <div className="flex items-center justify-between border-b border-line bg-sunken/60 px-5 py-3">
         <span className="font-mono text-xs text-ink-subtle">
@@ -317,26 +326,30 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
         <div className="flex items-center gap-2">
           <StatusBadge status={certificate.status} />
           {canManage && certificate.status === "Active" && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() =>
-                changeStatus(2, { pending: "Revoking…", success: "Certificate revoked" })
+                changeStatus(2, { pending: t("op.revoking"), success: t("op.revoked") })
               }
               disabled={busy}
-              className="rounded-md border border-danger/30 px-2 py-0.5 text-xs font-semibold text-danger-ink transition hover:bg-danger-tint disabled:opacity-50"
+              className="border-danger/30 py-0.5 text-danger-ink hover:bg-danger-tint"
             >
               {t("revoke")}
-            </button>
+            </Button>
           )}
           {canManage && certificate.status === "Revoked" && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() =>
-                changeStatus(1, { pending: "Reactivating…", success: "Certificate reactivated" })
+                changeStatus(1, { pending: t("op.reactivating"), success: t("op.reactivated") })
               }
               disabled={busy}
-              className="rounded-md border border-valid/30 px-2 py-0.5 text-xs font-semibold text-valid-ink transition hover:bg-valid-tint disabled:opacity-50"
+              className="border-valid/30 py-0.5 text-valid-ink hover:bg-valid-tint"
             >
               {t("reactivate")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -410,7 +423,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
             />
           ) : (
             <div
-              className={clsx(
+              className={cn(
                 "flex h-24 w-24 flex-col items-center justify-center rounded-full border-2 sm:h-28 sm:w-28",
                 verified ? "border-valid/40 text-valid-ink" : "border-line-strong text-ink-subtle"
               )}
@@ -440,6 +453,6 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
         <span className="truncate">commitment {truncateMiddle(certificate.metadataCommitment, 10, 8)}</span>
         {copied ? <Check size={13} className="text-valid-ink" /> : <Copy size={13} aria-hidden="true" />}
       </button>
-    </article>
+    </Card>
   );
 };

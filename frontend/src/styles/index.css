@@ -89,63 +89,11 @@
 }
 
 @layer components {
-  /* ---------- Buttons ---------- */
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5
-      text-sm font-semibold transition-[background-color,box-shadow,transform,color]
-      duration-150 disabled:pointer-events-none disabled:opacity-55;
-  }
-  .btn:active:not(:disabled) {
-    transform: translateY(0.5px) scale(0.99);
-  }
-  .btn-primary {
-    @apply btn bg-primary text-white shadow-xs hover:bg-primary-hover;
-  }
-  .btn-secondary {
-    @apply btn border border-line-strong bg-surface text-ink shadow-xs
-      hover:border-primary/40 hover:bg-primary-tint;
-  }
-  .btn-ghost {
-    @apply btn text-ink-muted hover:bg-sunken hover:text-ink;
-  }
-  .btn-danger {
-    @apply btn bg-danger text-white shadow-xs hover:brightness-95;
-  }
-
-  /* ---------- Form controls ---------- */
-  .label {
-    @apply mb-1.5 block text-[0.8125rem] font-medium text-ink-muted;
-  }
-  .input {
-    @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2.5
-      text-sm text-ink shadow-xs transition-[border-color,box-shadow] duration-150
-      placeholder:text-ink-subtle
-      focus:border-primary focus:shadow-focus focus:outline-none
-      disabled:cursor-not-allowed disabled:bg-sunken;
-  }
-  .input-mono {
-    @apply input font-mono text-[0.8125rem] tracking-tight;
-  }
-
-  /* ---------- Surfaces ---------- */
-  .panel {
-    @apply rounded-xl border border-line bg-surface shadow-sm;
-  }
-  .panel-pad {
-    @apply panel p-5 sm:p-6;
-  }
-
-  /* ---------- Status badge ---------- */
-  .badge {
-    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
-      text-xs font-semibold;
-  }
-
-  /* ---------- Mono data chip (addresses / CIDs / hashes) ---------- */
-  .chip-mono {
-    @apply inline-flex max-w-full items-center gap-1.5 rounded-md border border-line
-      bg-sunken px-2 py-1 font-mono text-[0.75rem] text-ink-muted;
-  }
+  /* ----------------------------------------------------------------
+     Interactive primitives now live in src/components/ui/* (shadcn-style
+     components themed to these tokens). Only the shimmer skeleton, which
+     needs a keyframe, remains defined here.
+     ---------------------------------------------------------------- */
 
   /* ---------- Loading skeleton ---------- */
   .skeleton {

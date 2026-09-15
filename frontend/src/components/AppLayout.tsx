@@ -106,6 +106,23 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
       <main className="mx-auto max-w-6xl animate-fade-up px-4 py-8 sm:px-6 sm:py-10">
         {children}
       </main>
+
+      <footer className="mt-8 border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-4 py-8 sm:flex-row sm:items-center sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">
+              <ShieldCheck size={16} strokeWidth={2.25} aria-hidden="true" />
+            </span>
+            <div className="leading-tight">
+              <span className="block font-serif text-sm font-semibold text-ink">Certify</span>
+              <span className="block text-xs text-ink-subtle">{t("brand.subtitle")}</span>
+            </div>
+          </div>
+          <p className="max-w-md text-xs leading-relaxed text-ink-subtle">
+            {t("footer.note")}
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
