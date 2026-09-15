@@ -66,9 +66,14 @@ export const VerifierDashboard = () => {
   const claimField = schema?.claims.find((f) => f.key === claimKey);
   const isExpiry = claimField?.kind === "timestamp" && predicate === "range";
 
-  const { data: disclosures } = useDisclosures(
-    certificateId ? BigInt(certificateId) : undefined
-  );
+  // Robust parse: strip anything non-numeric (e.g. a pasted "№0001") so an
+  // invalid input never throws inside BigInt() during render.
+  const certId = useMemo(() => {
+    const digits = certificateId.replace(/[^0-9]/g, "");
+    return digits ? BigInt(digits) : undefined;
+  }, [certificateId]);
+
+  const { data: disclosures } = useDisclosures(certId);
 
   useEffect(() => {
     validateZkFiles().then((s) => setZkFilesOk(s.wasm && s.zkey && s.vkey));
@@ -85,7 +90,7 @@ export const VerifierDashboard = () => {
   }
 
   const onSearch = async () => {
-    if (!certificateId) return;
+    if (certId === undefined) return;
     setCert(null);
     setMetadata(null);
     setZkProof(null);
@@ -95,7 +100,7 @@ export const VerifierDashboard = () => {
       const data = (await publicClient.readContract({
         ...registryContract,
         functionName: "certificates",
-        args: [BigInt(certificateId)],
+        args: [certId],
       })) as readonly [bigint, string, string, string, `0x${string}`, number, bigint, `0x${string}`];
       if (data[1] === "0x0000000000000000000000000000000000000000") {
         throw new Error(t("err.notFound"));
